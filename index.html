@@ -1,0 +1,3255 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>时间典当 · TIME PAWN</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  /* ============= 全局基础 ============= */
+  /* 画风：扁平插画 / 故事绘本（参考图）——纸本底色 + 苔绿墙面 + 深木 + 灯焰 */
+  :root {
+    /* ===== 纸本底（羊皮纸） ===== */
+    --paper:      #EDE6D3;
+    --paper-2:    #F4F0E4;
+    --paper-3:    #DCD0B4;
+
+    /* ===== 墨与深木（暗部主色） ===== */
+    --ink:        #2B2A26;
+    --wood-dark:  #221B15;
+    --wood:       #3E3229;
+    --wood-light: #5A4838;
+    --panel-black:#1E1A16;
+
+    /* ===== 苔绿 / 鼠尾草绿（墙面） ===== */
+    --sage:       #6F8F7C;
+    --sage-deep:  #58745F;
+    --sage-dark:  #445C4C;
+
+    /* ===== 石与土黄 ===== */
+    --stone:      #C9B489;
+    --stone-deep: #A68F66;
+
+    /* ===== 板岩蓝灰（海 / 雾 / 远景） ===== */
+    --slate:      #7E93A4;
+    --slate-deep: #5E7488;
+    --sea:        #4A6B82;
+    --sea-deep:   #2C4257;
+
+    /* ===== 光源 ===== */
+    --lamp:       #E8B75A;
+    --candle:     #F2D08A;
+    --gold:       #FFD54F;
+
+    /* ===== 点缀 ===== */
+    --rust:       #C1554A;
+
+    /* ===== 界面语义变量（亮色 · 羊皮纸 UI） ===== */
+    --bg-deep:    #E8E0C9;
+    --bg-panel:   #F3EDDD;
+    --bg-panel-2: #EAE2CC;
+    --grid-line:        rgba(43, 42, 38, 0.05);
+    --grid-line-strong: rgba(43, 42, 38, 0.10);
+    --text-dim:   #A08F70;
+    --text-mid:   #6E6250;
+    --text-bright:#38322A;
+    --danger:     var(--rust);
+    --water-blue: var(--sea);
+    --ink:        #2B2A26;
+    --lamp-deep:  #8F6A1C;
+
+    /* X 交叉木格（参考图墙面 / 护墙板上的交叉梁，亮色版） */
+    --hatch:
+      repeating-linear-gradient(45deg,  rgba(43,42,38,0.10) 0 1.5px, transparent 1.5px 14px),
+      repeating-linear-gradient(-45deg, rgba(43,42,38,0.10) 0 1.5px, transparent 1.5px 14px);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    width: 100%; height: 100%;
+    overflow: hidden;
+    background: var(--bg-deep);
+    color: var(--text-bright);
+    font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'Consolas', 'Courier New', monospace;
+    letter-spacing: 0.02em;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ============= 背景层：网格 + 扫描线 + 故障噪声 ============= */
+  .bg-grid {
+    position: fixed; inset: 0;
+    background-image:
+      linear-gradient(var(--grid-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-line) 1px, transparent 1px),
+      linear-gradient(var(--grid-line-strong) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-line-strong) 1px, transparent 1px);
+    background-size: 40px 40px, 40px 40px, 200px 200px, 200px 200px;
+    z-index: 0;
+    pointer-events: none;
+  }
+
+  .bg-vignette {
+    position: fixed; inset: 0;
+    background: radial-gradient(ellipse at center, transparent 44%, rgba(96, 78, 52, 0.22) 100%);
+    z-index: 1;
+    pointer-events: none;
+  }
+
+  /* 整幅颗粒 / 撒点质感（对应参考图的纸张噪点，覆盖在所有图层之上） */
+  .grain {
+    position: fixed; inset: 0; z-index: 400;
+    pointer-events: none;
+    opacity: 0.3;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='0.6'/%3E%3C/svg%3E");
+    background-size: 180px 180px;
+  }
+
+  /* 扫描线：从上往下缓慢漂移 */
+  .scanline {
+    position: fixed; inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      rgba(43, 42, 38, 0.05) 0px,
+      rgba(43, 42, 38, 0.05) 1px,
+      transparent 1px,
+      transparent 3px
+    );
+    z-index: 2;
+    pointer-events: none;
+    animation: scanline-move 8s linear infinite;
+  }
+  @keyframes scanline-move {
+    0%   { background-position: 0 0; }
+    100% { background-position: 0 40px; }
+  }
+
+  /* 横向扫描光束（故障感） */
+  .scan-beam {
+    position: fixed;
+    left: -10%; right: -10%;
+    height: 120px;
+    background: linear-gradient(180deg, transparent, rgba(43,42,38,0.07), transparent);
+    z-index: 3;
+    pointer-events: none;
+    animation: beam-sweep 12s ease-in-out infinite;
+  }
+  @keyframes beam-sweep {
+    0%, 100% { top: -15%; opacity: 0; }
+    10%      { opacity: 1; }
+    90%      { opacity: 1; }
+    50%      { top: 110%; opacity: 0.6; }
+  }
+
+  /* ============= 主布局 ============= */
+  .app-root {
+    position: relative;
+    width: 100%; height: 100%;
+    z-index: 10;
+    display: grid;
+    grid-template-columns: 260px 1fr 260px;
+    gap: 1px;
+    background: rgba(43, 42, 38, 0.12);
+  }
+
+  .panel {
+    /* X 交叉木格 + 羊皮纸渐变（亮色 UI） */
+    background:
+      var(--hatch),
+      linear-gradient(180deg, #F5F0E2 0%, #ECE4D0 100%);
+    border: 1px solid rgba(43, 42, 38, 0.18);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .panel::before {
+    /* 面板角落装饰 */
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 14px; height: 14px;
+    border-top: 2px solid var(--lamp);
+    border-left: 2px solid var(--lamp);
+    pointer-events: none;
+  }
+  .panel::after {
+    content: '';
+    position: absolute;
+    bottom: 0; right: 0;
+    width: 14px; height: 14px;
+    border-bottom: 2px solid var(--lamp);
+    border-right: 2px solid var(--lamp);
+    pointer-events: none;
+  }
+
+  /* ============= 左侧状态栏 ============= */
+  .player-panel { padding: 24px 20px; display: flex; flex-direction: column; gap: 24px; }
+
+  .logo-block {
+    display: flex; flex-direction: column; gap: 2px;
+    padding-bottom: 18px;
+    border-bottom: 1px dashed rgba(43, 42, 38, 0.2);
+  }
+  .logo-title {
+    font-size: 16px; font-weight: 700;
+    color: var(--lamp-deep);
+    letter-spacing: 0.15em;
+  }
+  .logo-sub {
+    font-size: 10px; color: var(--text-dim);
+    letter-spacing: 0.3em; text-transform: uppercase;
+  }
+
+  .stat-row {
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .stat-label {
+    font-size: 10px; color: var(--text-dim);
+    letter-spacing: 0.2em; text-transform: uppercase;
+  }
+  .stat-value {
+    font-size: 32px; font-weight: 700;
+    color: var(--text-bright);
+    font-variant-numeric: tabular-nums;
+  }
+  .stat-value .unit {
+    font-size: 12px; color: var(--lamp-deep);
+    margin-left: 6px; letter-spacing: 0.1em;
+  }
+
+  .btn {
+    position: relative;
+    padding: 14px 18px;
+    border: 1px solid rgba(43, 42, 38, 0.55);
+    background: linear-gradient(180deg, #FBF7EC, #F0E9D6);
+    color: var(--text-bright);
+    font-family: inherit; font-size: 12px;
+    letter-spacing: 0.15em; text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    overflow: hidden;
+  }
+  .btn:hover {
+    background: linear-gradient(180deg, #F6E9C8, #EEDFAE);
+    box-shadow: 0 0 20px rgba(232,183,90,0.4);
+  }
+  .btn:active { transform: translateY(1px); }
+  .btn[disabled] {
+    border-color: var(--text-dim);
+    background: rgba(43,42,38,0.05);
+    color: var(--text-dim);
+    cursor: not-allowed;
+    box-shadow: none;
+  }
+  .btn .btn-corner {
+    position: absolute;
+    width: 8px; height: 8px;
+    border-color: var(--lamp-deep);
+    border-style: solid;
+  }
+  .btn-tl { top: -1px; left: -1px; border-width: 2px 0 0 2px; }
+  .btn-br { bottom: -1px; right: -1px; border-width: 0 2px 2px 0; }
+
+  .btn-pawn { margin-top: 8px; }
+
+  .log-box {
+    margin-top: auto;
+    padding: 12px;
+    background: #EFE8D3;
+    border: 1px solid rgba(43,42,38,0.14);
+    font-size: 10px; color: var(--text-dim);
+    line-height: 1.8;
+    max-height: 160px; overflow-y: auto;
+  }
+  .log-box .log-entry { color: var(--text-mid); }
+  .log-box .log-entry.plus { color: var(--lamp-deep); }
+
+  /* ============= 中间主内容 ============= */
+  .main-panel {
+    padding: 32px 40px;
+    display: flex; flex-direction: column;
+    position: relative;
+  }
+
+  .screen { display: none; flex: 1; flex-direction: column; animation: fade-in 0.5s ease; }
+  .screen.active { display: flex; }
+  @keyframes fade-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+  /* --- WELCOME 屏 --- */
+  .welcome-title {
+    font-size: 48px; font-weight: 900;
+    color: var(--text-bright);
+    letter-spacing: 0.25em;
+    margin-bottom: 8px;
+  }
+  .welcome-subtitle {
+    font-size: 12px; color: var(--text-dim);
+    letter-spacing: 0.4em; text-transform: uppercase;
+    margin-bottom: 48px;
+  }
+  .welcome-body {
+    font-size: 13px; color: var(--text-mid);
+    line-height: 2; max-width: 540px;
+  }
+  .welcome-body .hl { color: var(--lamp-deep); }
+
+  .cta-row { margin-top: 40px; display: flex; gap: 16px; align-items: center; }
+
+  /* --- SCRIPT_LIST 屏 --- */
+  .section-head {
+    display: flex; justify-content: space-between; align-items: baseline;
+    margin-bottom: 24px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid rgba(43,42,38,0.2);
+  }
+  .section-title {
+    font-size: 18px; color: var(--text-bright);
+    letter-spacing: 0.2em; font-weight: 700;
+  }
+  .section-meta { font-size: 10px; color: var(--text-dim); letter-spacing: 0.25em; }
+
+  .script-card {
+    display: flex; gap: 24px;
+    padding: 20px;
+    border: 1px solid rgba(43,42,38,0.22);
+    background: linear-gradient(180deg, #F7F2E4, #F1EAD7);
+    transition: all 0.3s ease;
+    cursor: pointer;
+  }
+  .script-card:hover { border-color: var(--lamp-deep); box-shadow: 0 0 30px rgba(232,183,90,0.3); }
+
+  .script-thumb {
+    width: 160px; height: 120px; flex-shrink: 0;
+    position: relative;
+    overflow: hidden;
+    background: var(--bg-deep);
+  }
+  /* 泰坦尼克号的抽象 SVG 插画（纯 CSS 也可以，这里用内联 SVG） */
+  .script-thumb svg { width: 100%; height: 100%; }
+
+  .script-info { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+  .script-name { font-size: 18px; font-weight: 700; color: var(--text-bright); }
+  .script-date { font-size: 11px; color: var(--lamp-deep); letter-spacing: 0.1em; }
+  .script-desc { font-size: 12px; color: var(--text-mid); line-height: 1.8; margin-top: 6px; }
+  .script-cost-row {
+    margin-top: auto; display: flex; align-items: center; justify-content: space-between;
+  }
+  .script-cost { font-size: 14px; color: var(--lamp-deep); }
+  .script-cost .num { font-size: 22px; font-weight: 700; margin-right: 4px; }
+
+  /* 提示条 */
+  .toast-hint {
+    margin-top: 20px;
+    padding: 10px 14px;
+    font-size: 11px;
+    border: 1px dashed var(--danger);
+    color: var(--danger);
+    background: rgba(239,83,80,0.08);
+    letter-spacing: 0.1em;
+    display: none;
+  }
+  .toast-hint.show { display: block; animation: toast-in 0.3s ease; }
+  @keyframes toast-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+
+  /* ============= 右侧物品栏 ============= */
+  .badge-panel { padding: 24px 20px; display: flex; flex-direction: column; gap: 20px; }
+  .badge-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+  }
+  .badge-slot {
+    aspect-ratio: 1;
+    border: 1px dashed rgba(43,42,38,0.22);
+    background: rgba(43,42,38,0.03);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 9px; color: var(--text-dim); text-align: center;
+    letter-spacing: 0.05em;
+    position: relative;
+  }
+  .badge-slot .lock-icon { font-size: 16px; color: var(--text-dim); opacity: 0.5; }
+  .empty-hint {
+    margin-top: auto;
+    font-size: 10px; color: var(--text-dim);
+    line-height: 1.8;
+    letter-spacing: 0.05em;
+  }
+
+  /* ============= 沉浸体验屏（泰坦尼克） ============= */
+  .immersive-screen {
+    position: fixed; inset: 0; z-index: 100;
+    background: #14100C;
+    overflow: hidden;
+    display: none;
+  }
+  .immersive-screen.active { display: block; animation: fade-in 0.8s ease; }
+
+  /* 船体倾斜容器 */
+  .ship-wrapper {
+    position: absolute; inset: 0;
+    transform-origin: 50% 72%;
+    animation: ship-tilt 9s ease-in-out infinite alternate;
+  }
+  @keyframes ship-tilt {
+    0%   { transform: rotate(-2deg); }
+    100% { transform: rotate(-5.5deg); }
+  }
+
+  /* 走廊 SVG 插画层 */
+  .ship-scene {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+  }
+
+  /* 走廊场景层（点击可指定主角去向） */
+  .player-layer {
+    position: absolute; inset: 0;
+    cursor: crosshair;
+  }
+
+  /* 海水淹没遮罩 — 从底部上升（高度由 JS 逐帧驱动） */
+  .water-layer {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    height: 0%;
+    background:
+      linear-gradient(180deg,
+        rgba(126, 147, 164, 0.00) 0%,
+        rgba(74, 107, 130, 0.52) 16%,
+        rgba(44, 66, 87, 0.88) 58%,
+        rgba(19, 29, 39, 0.97) 100%);
+    pointer-events: none;
+    z-index: 5;
+  }
+  /* 水面淡色浪脊 */
+  .water-layer::before {
+    content: '';
+    position: absolute; left: 0; right: 0; top: 0; height: 9px;
+    background: linear-gradient(180deg, rgba(237,230,211,0.34), rgba(237,230,211,0));
+  }
+
+  /* 水面细碎波纹 */
+  .water-ripples {
+    position: absolute; left: 0; right: 0;
+    top: -6px; height: 20px;
+    background-image:
+      radial-gradient(ellipse at 12% 9px, rgba(244,240,228,0.28) 0%, transparent 62%),
+      radial-gradient(ellipse at 42% 5px, rgba(244,240,228,0.20) 0%, transparent 62%),
+      radial-gradient(ellipse at 72% 11px, rgba(244,240,228,0.18) 0%, transparent 62%),
+      radial-gradient(ellipse at 96% 7px, rgba(244,240,228,0.26) 0%, transparent 62%);
+    animation: ripple-flow 3.4s linear infinite;
+  }
+  @keyframes ripple-flow {
+    0%   { transform: translateX(0); }
+    100% { transform: translateX(-40px); }
+  }
+
+  /* 边缘冰冷海水涌入 — 屏幕四周的板岩蓝遮罩（透明度由 JS 驱动） */
+  .edge-flood {
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(ellipse at top,    rgba(74,107,130,0.0) 32%, rgba(74,107,130,0.42) 100%),
+      radial-gradient(ellipse at bottom, rgba(44,66,87,0.0) 26%,  rgba(28,42,56,0.55) 100%),
+      radial-gradient(ellipse at left,   rgba(74,107,130,0.0) 30%, rgba(74,107,130,0.40) 100%),
+      radial-gradient(ellipse at right,  rgba(74,107,130,0.0) 30%, rgba(74,107,130,0.40) 100%);
+    pointer-events: none;
+    z-index: 6;
+    opacity: 0;
+  }
+
+  /* 打字机文字层 */
+  .narrative-box {
+    position: absolute;
+    left: 50%; bottom: 10%;
+    transform: translateX(-50%);
+    width: min(680px, 80vw);
+    padding: 24px 28px;
+    background: rgba(246, 241, 226, 0.94);
+    border: 1px solid rgba(43, 42, 38, 0.32);
+    backdrop-filter: blur(8px);
+    z-index: 20;
+    font-size: 15px;
+    line-height: 2;
+    color: var(--text-bright);
+    letter-spacing: 0.05em;
+    box-shadow: 0 0 40px rgba(10,7,4,0.55);
+  }
+  .narrative-box::before {
+    content: '【沉浸式记忆注入 · 1912】';
+    display: block;
+    font-size: 10px; color: var(--lamp-deep);
+    letter-spacing: 0.3em;
+    margin-bottom: 14px;
+  }
+  .narrative-box .cursor-blink::after {
+    content: '▌';
+    color: var(--lamp-deep);
+    animation: blink 0.8s step-end infinite;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* 顶部 HUD（沉浸态） */
+  .hud-top {
+    position: absolute; top: 20px; left: 20px; right: 20px;
+    display: flex; justify-content: space-between;
+    z-index: 30;
+    font-size: 11px; color: var(--lamp);
+    letter-spacing: 0.2em;
+  }
+  .hud-top .sys-label { opacity: 0.6; }
+
+  /* ============= 系统提示框 ============= */
+  .system-modal-backdrop {
+    position: fixed; inset: 0; z-index: 200;
+    background: rgba(0,0,0,0.75);
+    backdrop-filter: blur(4px);
+    display: none;
+    align-items: center; justify-content: center;
+  }
+  .system-modal-backdrop.active { display: flex; animation: fade-in 0.4s ease; }
+
+  .system-modal {
+    width: min(480px, 90vw);
+    padding: 28px 32px;
+    background: #F6F1E2;
+    border: 1px solid rgba(43,42,38,0.35);
+    box-shadow: 0 0 60px rgba(20,14,8,0.5);
+    position: relative;
+  }
+  .system-modal .modal-title {
+    font-size: 12px; color: var(--lamp-deep);
+    letter-spacing: 0.3em; text-transform: uppercase;
+    margin-bottom: 16px;
+    padding-bottom: 10px;
+    border-bottom: 1px dashed rgba(43,42,38,0.3);
+  }
+  .system-modal .modal-body {
+    font-size: 13px; color: var(--text-bright); line-height: 2;
+  }
+  .system-modal .modal-body .prompt-text {
+    padding: 14px 16px;
+    margin: 12px 0;
+    background: rgba(232,183,90,0.16);
+    border-left: 2px solid var(--lamp-deep);
+    color: var(--text-bright);
+  }
+  .system-modal .modal-actions {
+    margin-top: 24px;
+    display: flex; gap: 12px; justify-content: flex-end;
+  }
+
+  /* ============= 右侧物品栏（动态） ============= */
+  .inv-list { display: flex; flex-direction: column; gap: 8px; max-height: 200px; overflow-y: auto; }
+
+  .inv-item {
+    display: flex; gap: 10px; align-items: flex-start;
+    padding: 10px;
+    border: 1px solid rgba(43, 42, 38, 0.24);
+    background: linear-gradient(180deg, rgba(232,183,90,0.12), rgba(232,183,90,0.03));
+    animation: item-in 0.7s cubic-bezier(.2,.9,.3,1);
+  }
+  @keyframes item-in {
+    0%   { opacity: 0; transform: translateX(22px); }
+    100% { opacity: 1; transform: none; }
+  }
+  .inv-icon { font-size: 17px; line-height: 1; filter: drop-shadow(0 0 6px rgba(232,183,90,0.55)); }
+  .inv-name { font-size: 11px; color: var(--text-bright); line-height: 1.5; }
+  .inv-desc { font-size: 9px; color: var(--text-dim); margin-top: 3px; letter-spacing: 0.1em; }
+
+  .badge-slot.unlocked {
+    border-style: solid; border-color: var(--lamp-deep);
+    background: rgba(232,183,90,0.16);
+    flex-direction: column; gap: 3px;
+    animation: item-in 0.7s cubic-bezier(.2,.9,.3,1);
+  }
+  .badge-slot.rare {
+    border-color: #ffd54f;
+    background: radial-gradient(circle at 50% 38%, rgba(255,213,79,0.35), rgba(255,213,79,0.04) 72%);
+    animation: rare-pulse 2.6s ease-in-out infinite;
+  }
+  @keyframes rare-pulse {
+    0%, 100% { box-shadow: 0 0 14px rgba(255,213,79,0.4), inset 0 0 10px rgba(255,213,79,0.18); }
+    50%      { box-shadow: 0 0 30px rgba(255,213,79,0.85), inset 0 0 16px rgba(255,213,79,0.4); }
+  }
+  .badge-icon { font-size: 16px; color: #ffd54f; }
+  .badge-name { font-size: 7px; color: #ffe082; line-height: 1.2; text-align: center; padding: 0 2px; letter-spacing: 0; }
+
+  /* ============= 分支过场层 ============= */
+  .branch-layer {
+    position: fixed; inset: 0; z-index: 150;
+    background: #14100C;
+    display: none; overflow: hidden;
+  }
+  .branch-layer.active { display: block; }
+  .branch-layer.shake { animation: screen-shake 0.09s steps(2) infinite; }
+  @keyframes screen-shake {
+    0%   { transform: translate(0, 0); }
+    25%  { transform: translate(-5px, 3px); }
+    50%  { transform: translate(4px, -4px); }
+    75%  { transform: translate(-3px, -2px); }
+    100% { transform: translate(2px, 4px); }
+  }
+
+  .branch-stage {
+    position: absolute; inset: 0;
+    transform-origin: 50% 62%;
+    will-change: transform, filter, opacity;
+  }
+  .branch-scene { position: absolute; inset: 0; display: none; }
+  .branch-scene.show { display: block; }
+  .branch-scene svg { width: 100%; height: 100%; display: block; }
+
+  /* 分支 A：坐上座位后下沉 */
+  .branch-stage.sinking { animation: seat-sink 2.4s ease-in forwards; }
+  @keyframes seat-sink {
+    0%   { transform: translateY(0) rotate(0deg); opacity: 1; }
+    100% { transform: translateY(70px) rotate(4deg) scale(1.08); opacity: 0.3; }
+  }
+
+  /* 分支 B：溺水下沉 —— 分阶段电影镜头（不再整屏压扁） */
+  #heroSink, #heroPose, #heroBubbles circle, #fallDebris > g {
+    transform-box: fill-box; transform-origin: center;
+  }
+  .arm-l, .arm-r, #shaftGroup, #shipAbove { transform-box: view-box; }
+  .arm-l { transform-origin: 560px 356px; }
+  .arm-r { transform-origin: 640px 356px; }
+
+  /* 阶段①：drowning —— 姿态翻转 + 摆臂抽动 + 尾流气泡 */
+  .branch-stage.drowning #heroPose {
+    transition: transform 2.2s cubic-bezier(.5,.05,.4,1);
+    transform: rotate(76deg);
+  }
+  .branch-stage.drowning .hero-shadow { transition: opacity 2s ease; opacity: 0; }
+  .rim-glow { transition: opacity 2.4s ease; }
+  .branch-stage.drowning .rim-glow { opacity: .16; }
+  .branch-stage.depth-2 .rim-glow { opacity: 0; }
+  .branch-stage.drowning .arm-l { animation: arm-flail-l 1.1s ease-in-out 3; }
+  .branch-stage.drowning .arm-r { animation: arm-flail-r 1.1s ease-in-out 3; }
+  @keyframes arm-flail-l {
+    0%,100% { transform: rotate(0deg); } 30% { transform: rotate(-26deg); } 65% { transform: rotate(16deg); }
+  }
+  @keyframes arm-flail-r {
+    0%,100% { transform: rotate(0deg); } 30% { transform: rotate(24deg); } 65% { transform: rotate(-18deg); }
+  }
+  .branch-stage.flail .arm-l { animation: arm-flail-l .55s ease-in-out 2; }
+  .branch-stage.flail .arm-r { animation: arm-flail-r .55s ease-in-out 2; }
+
+  /* 主角尾流气泡：从头侧持续涌出、上升消散 */
+  #heroBubbles circle { opacity: 0; }
+  .branch-stage.drowning #heroBubbles circle { animation: h-bubble 2.5s ease-out infinite; }
+  .branch-stage.drowning #heroBubbles circle:nth-child(2n) { animation-duration: 3.1s; animation-delay: .5s; }
+  .branch-stage.drowning #heroBubbles circle:nth-child(3n) { animation-duration: 2.2s; animation-delay: 1s; }
+  .branch-stage.drowning #heroBubbles circle:nth-child(4n+1) { animation-delay: 1.5s; }
+  @keyframes h-bubble {
+    0%   { transform: translate(0,0) scale(.5); opacity: 0; }
+    12%  { opacity: .85; }
+    100% { transform: translate(6px,-150px) scale(1.3); opacity: 0; }
+  }
+
+  /* 阶段②：sinking-anim —— 11 秒下沉长镜头（缩小 + 漂移 + 融入黑暗） */
+  .branch-stage.sinking-anim #heroSink { animation: hero-sink 11s cubic-bezier(.55,.06,.68,.19) forwards; }
+  @keyframes hero-sink {
+    0%   { transform: translate(0,0) scale(1) rotate(0deg); }
+    22%  { transform: translate(14px,120px) scale(.86) rotate(6deg); }
+    55%  { transform: translate(34px,250px) scale(.62) rotate(-5deg); }
+    80%  { transform: translate(46px,340px) scale(.48) rotate(3deg); opacity: .8; }
+    100% { transform: translate(54px,415px) scale(.4) rotate(0deg); opacity: .5; }
+  }
+  /* 同期镜头缓缓拉远 —— 制造空旷无依感 */
+  .cam-b.cam-dive { animation: cam-dive 11s ease-in-out forwards; }
+  @keyframes cam-dive {
+    0%   { transform: translate(0,86px) scale(1.24); }
+    30%  { transform: translate(0,58px) scale(1.1); }
+    100% { transform: translate(0,-14px) scale(.94); }
+  }
+
+  /* 阶段③：depth-1 —— 光柱远去 / 沉船消失 / 浮木向上漂走（相对运动视差） */
+  #shaftGroup { transform-origin: 600px 0px; }
+  .branch-stage.depth-1 #shaftGroup { animation: shaft-away 4.5s ease-out forwards; }
+  @keyframes shaft-away {
+    0%   { transform: translate(0,0) scaleY(1); opacity: 1; }
+    100% { transform: translate(0,-250px) scaleY(1.5); opacity: 0; }
+  }
+  .branch-stage.depth-1 #shipAbove { animation: ship-away 5s ease-in forwards; }
+  @keyframes ship-away {
+    0%   { transform: translate(0,0) scale(1); opacity: .4; }
+    100% { transform: translate(0,-320px) scale(1.5); opacity: 0; }
+  }
+  #fallDebris > g { opacity: 0; }
+  .branch-stage.depth-1 #fallDebris > g { animation: plank-float 6s ease-in forwards; }
+  .branch-stage.depth-1 #fallDebris > g:nth-child(2) { animation-duration: 5.2s; animation-delay: .4s; }
+  .branch-stage.depth-1 #fallDebris > g:nth-child(3) { animation-duration: 6.8s; animation-delay: .9s; }
+  .branch-stage.depth-1 #fallDebris > g:nth-child(4) { animation-duration: 5.8s; animation-delay: 1.4s; }
+  .branch-stage.depth-1 #fallDebris > g:nth-child(5) { animation-duration: 6.4s; animation-delay: .2s; }
+  @keyframes plank-float {
+    0%   { transform: translate(0,180px) rotate(0deg); opacity: 0; }
+    15%  { opacity: .8; }
+    100% { transform: translate(0,-540px) rotate(-26deg); opacity: 0; }
+  }
+
+  /* 阶段④：depth-2 —— 暗幕加深 + 浮游生物的微光取而代之 */
+  #darkVeil { opacity: 0; transition: opacity 2.8s ease; pointer-events: none; }
+  .branch-stage.depth-2 #darkVeil { opacity: .55; }
+  #plankton { opacity: 0; transition: opacity 3s ease; }
+  .branch-stage.depth-2 #plankton { opacity: .5; }
+  #plankton circle { animation: plankton-drift 9s ease-in-out infinite alternate; }
+  #plankton circle:nth-child(2n) { animation-duration: 12s; }
+  #plankton circle:nth-child(3n) { animation-duration: 7s; }
+  @keyframes plankton-drift {
+    from { transform: translate(0,0); }
+    to   { transform: translate(-26px,30px); }
+  }
+  /* 阶段⑤：depth-3 —— 近黑，只剩轮廓 */
+  .branch-stage.depth-3 #darkVeil { opacity: .84; }
+
+  /* ===== 下沉镜头细节增强 ===== */
+  /* 心跳暗角：溺水初期砰砰收缩，depth-3「不再疼了」时停止 */
+  .pulse-vignette {
+    position: absolute; inset: 0; pointer-events: none; z-index: 6;
+    background: radial-gradient(ellipse at center, transparent 52%, rgba(5,10,16,.62) 100%);
+    opacity: 0; transition: opacity 2s ease;
+  }
+  .branch-stage.drowning .pulse-vignette { animation: heartbeat 1.2s ease-in-out infinite; }
+  .branch-stage.depth-3 .pulse-vignette { animation: none; opacity: 0; }
+  @keyframes heartbeat {
+    0%,100% { opacity: .14; transform: scale(1); }
+    12%     { opacity: .52; transform: scale(1.018); }
+    24%     { opacity: .22; transform: scale(1.006); }
+    36%     { opacity: .44; transform: scale(1.012); }
+  }
+
+  /* 水流涌动：整个舞台极轻地摇晃，不是静止的死水 */
+  .branch-stage.drowning { animation: stage-sway 8.5s ease-in-out infinite; }
+  @keyframes stage-sway {
+    0%,100% { transform: translate(0,0) rotate(0deg); }
+    25%     { transform: translate(-5px,3px) rotate(-.28deg); }
+    50%     { transform: translate(4px,-2px) rotate(.22deg); }
+    75%     { transform: translate(-3px,-4px) rotate(-.18deg); }
+  }
+
+  /* 光柱闪烁：水面折射的呼吸感（depth-1 后被 shaft-away 覆盖） */
+  #shaftGroup { animation: shaft-flicker 5.5s ease-in-out infinite alternate; }
+  @keyframes shaft-flicker { from { opacity: .82; } to { opacity: 1; } }
+
+  /* 海洋雪：缓慢下沉的微粒，越深越明显 */
+  #marineSnow { opacity: .22; transition: opacity 2.5s ease; }
+  .branch-stage.depth-1 #marineSnow { opacity: .5; }
+  .branch-stage.depth-2 #marineSnow { opacity: .85; }
+  #marineSnow circle {
+    transform-box: fill-box; transform-origin: center;
+    animation: snow-drift 12s linear infinite;
+  }
+  @keyframes snow-drift {
+    0%   { opacity: 0; transform: translate(0,-24px); }
+    14%  { opacity: var(--o, .4); }
+    86%  { opacity: var(--o, .4); }
+    100% { opacity: 0; transform: translate(-34px, 86px); }
+  }
+
+  /* 围巾脱落：depth-1 时向上漂走（身上最后一点颜色先离开你） */
+  #scarfFloat { transform-box: view-box; transform-origin: 588px 330px; opacity: 0; }
+  #scarfFloat.detach { animation: scarf-away 6.5s cubic-bezier(.3,.1,.6,1) forwards; }
+  @keyframes scarf-away {
+    0%   { opacity: 0; transform: translate(0,0) rotate(0deg); }
+    8%   { opacity: .95; }
+    55%  { transform: translate(-52px,-260px) rotate(-24deg); opacity: .8; }
+    100% { transform: translate(-96px,-520px) rotate(-52deg); opacity: 0; }
+  }
+
+  /* 搜救探照灯：depth-2 从头顶扫过，没有找到你 */
+  #searchlight { transform-box: view-box; transform-origin: 600px 0px; opacity: 0; }
+  #searchlight.sweep { animation: search-sweep 5.2s ease-in-out forwards; }
+  @keyframes search-sweep {
+    0%   { opacity: 0; transform: translate(-190px,0) skewX(-6deg); }
+    22%  { opacity: .4; }
+    60%  { opacity: .32; }
+    100% { opacity: 0; transform: translate(210px,0) skewX(5deg); }
+  }
+
+  /* 深处的鱼群剪影：漠然路过 */
+  #fishGroup { opacity: 0; }
+  #fishGroup > g { transform-box: view-box; }
+  #fishGroup.swim { opacity: 1; }
+  #fishGroup.swim > g { animation: fish-pass 5s linear forwards; }
+  #fishGroup.swim > g:nth-child(2) { animation-delay: .7s; animation-duration: 4.2s; }
+  #fishGroup.swim > g:nth-child(3) { animation-delay: 1.3s; animation-duration: 5.6s; }
+  @keyframes fish-pass {
+    0%   { transform: translate(-260px,0); opacity: 0; }
+    12%  { opacity: .5; }
+    85%  { opacity: .5; }
+    100% { transform: translate(1560px,0); opacity: 0; }
+  }
+
+  /* 点击的压力涟漪：水在回应你 */
+  #waveLayer circle {
+    fill: none; stroke: #DCE9F2; stroke-width: 3; pointer-events: none;
+    transform-box: fill-box; transform-origin: center;
+    animation: wave-ring 1.15s ease-out forwards;
+  }
+  @keyframes wave-ring {
+    0%   { transform: scale(.15); opacity: .55; }
+    100% { transform: scale(1); opacity: 0; }
+  }
+
+  /* 点一下浮木，它在水里打个转 */
+  #fallDebris > g.nudge rect { animation: rect-jolt .8s ease; }
+  @keyframes rect-jolt {
+    0% { transform: rotate(0deg); } 30% { transform: rotate(14deg); }
+    70% { transform: rotate(-8deg); } 100% { transform: rotate(0deg); }
+  }
+  /* 点一下浮游微光，它们惊散又聚拢 */
+  #plankton.scatter { animation: plankton-scatter .9s ease; }
+  @keyframes plankton-scatter {
+    0% { opacity: .5; } 30% { opacity: .12; } 100% { opacity: .5; }
+  }
+
+  /* 海水上升（分支 A） */
+  .branch-water {
+    position: absolute; left: 0; right: 0; bottom: 0; height: 0;
+    background: linear-gradient(180deg, rgba(126,147,164,0.10), rgba(74,107,130,0.78) 58%, rgba(19,29,39,0.98));
+    z-index: 5; pointer-events: none;
+    transition: height 2.4s cubic-bezier(.4,0,.2,1);
+  }
+  .branch-water.active { height: 78%; }
+
+  /* 黑场幕布 */
+  .black-curtain {
+    position: absolute; inset: 0; background: #000;
+    opacity: 0; pointer-events: none; z-index: 60;
+    transition: opacity 1.2s ease;
+  }
+  .black-curtain.active { opacity: 1; }
+
+  /* 花屏 / 马赛克撕裂 */
+  .glitch-overlay {
+    position: absolute; inset: 0; z-index: 70;
+    pointer-events: none; display: none;
+  }
+  .glitch-overlay.active { display: block; }
+  .glitch-overlay .band {
+    position: absolute; left: -10%; width: 120%; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.85), transparent);
+    mix-blend-mode: overlay;
+    animation: band-sweep 0.26s steps(3) infinite;
+  }
+  @keyframes band-sweep {
+    0%   { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+  }
+  .glitch-overlay .tear {
+    position: absolute; left: 0; right: 0; height: 5px;
+    background: #00e5ff; mix-blend-mode: screen; opacity: 0.75;
+  }
+  .mosaic-block {
+    position: absolute; mix-blend-mode: hard-light;
+    animation: mosaic-flicker 0.11s steps(2) infinite alternate;
+  }
+  @keyframes mosaic-flicker {
+    0%   { opacity: 0.8; transform: translate(0, 0) scale(1); }
+    100% { opacity: 0.2; transform: translate(3px, -3px) scale(1.05); }
+  }
+
+  /* 分支字幕 */
+  .branch-caption {
+    position: absolute; left: 50%; bottom: 9%;
+    transform: translateX(-50%);
+    width: min(760px, 86vw);
+    text-align: center;
+    font-size: 13px; line-height: 2;
+    color: var(--paper-2);
+    letter-spacing: 0.1em;
+    z-index: 80;
+    text-shadow: 0 2px 16px rgba(0,0,0,0.95);
+  }
+  .branch-caption .sfx {
+    display: block; margin-top: 12px;
+    font-size: 10px; color: var(--lamp);
+    letter-spacing: 0.3em; opacity: 0.85;
+  }
+
+  /* 警告框（强制剥离神经链接） */
+  .warning-box {
+    position: absolute; left: 50%; top: 50%;
+    transform: translate(-50%, -50%) scale(0.94);
+    width: min(660px, 88vw);
+    padding: 26px 30px;
+    display: flex; gap: 16px; align-items: flex-start;
+    background: rgba(34, 16, 14, 0.95);
+    border: 1px solid rgba(193,85,74,0.75);
+    box-shadow: 0 0 60px rgba(193,85,74,0.45), inset 0 0 34px rgba(193,85,74,0.08);
+    z-index: 90; opacity: 0; pointer-events: none;
+    transition: opacity .35s ease, transform .35s ease;
+  }
+  .warning-box.active { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  .warning-icon { font-size: 24px; color: var(--danger); line-height: 1; animation: blink 0.7s step-end infinite; }
+  .warning-text { font-size: 14px; line-height: 1.9; color: #ffcdd2; letter-spacing: 0.08em; }
+  .warning-text::after { content: '▌'; color: var(--danger); margin-left: 2px; animation: blink 0.8s step-end infinite; }
+  .warning-text.done::after { display: none; }
+
+  /* ============= 结算界面 ============= */
+  .settlement-backdrop {
+    position: fixed; inset: 0; z-index: 210;
+    background: radial-gradient(ellipse at center, rgba(38,28,20,0.95), rgba(16,11,7,0.99));
+    backdrop-filter: blur(6px);
+    display: none; align-items: center; justify-content: center;
+    padding: 24px; overflow-y: auto;
+  }
+  .settlement-backdrop.active { display: flex; animation: fade-in .5s ease; }
+  .settlement-wrap { width: min(740px, 94vw); display: flex; flex-direction: column; gap: 22px; }
+
+  /* 灵魂拷问 */
+  .soul-question { display: none; }
+  .soul-question.active { display: block; animation: soul-in 1.5s cubic-bezier(.2,.9,.3,1); }
+  @keyframes soul-in {
+    0%   { opacity: 0; transform: scale(0.93); filter: blur(8px); }
+    100% { opacity: 1; transform: none; filter: none; }
+  }
+  .soul-question {
+    text-align: center;
+    font-size: 21px; line-height: 1.9; font-weight: 700;
+    color: var(--paper-2);
+    letter-spacing: 0.14em;
+    padding: 24px;
+    border-top: 1px solid rgba(255,213,79,0.4);
+    border-bottom: 1px solid rgba(255,213,79,0.4);
+    text-shadow: 0 0 24px rgba(232,183,90,0.65), 0 0 70px rgba(232,183,90,0.3);
+  }
+
+  .settlement-card {
+    border: 1px solid rgba(43,42,38,0.35);
+    background: linear-gradient(180deg, #F6F1E2, #EFE7D3);
+    box-shadow: 0 0 70px rgba(10,7,4,0.6);
+    animation: fade-in .55s ease;
+  }
+  .settlement-top {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 14px 20px;
+    border-bottom: 1px dashed rgba(43,42,38,0.3);
+    font-size: 10px; letter-spacing: 0.25em;
+  }
+  .settlement-tag { color: var(--lamp-deep); }
+  .settlement-branch { color: var(--text-dim); }
+
+  .settlement-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 1px;
+    background: rgba(43,42,38,0.14);
+  }
+  .settlement-col { background: #F1EAD6; padding: 18px 20px; }
+  .settlement-label { font-size: 9px; color: var(--text-dim); letter-spacing: 0.25em; margin-bottom: 10px; }
+  .settlement-coin {
+    font-size: 34px; font-weight: 700;
+    color: var(--lamp-deep);
+    font-variant-numeric: tabular-nums;
+  }
+  .settlement-coin.negative { color: var(--danger); text-shadow: none; }
+  .settlement-note { margin-top: 10px; font-size: 10px; line-height: 1.8; color: var(--text-mid); }
+
+  .settlement-item { display: flex; gap: 12px; align-items: flex-start; }
+  .settlement-item-icon { font-size: 26px; line-height: 1; }
+  .settlement-item-icon.rare { color: #B8860B; filter: drop-shadow(0 0 12px rgba(232,183,90,0.85)); }
+  .settlement-item-name { font-size: 12px; color: var(--text-bright); line-height: 1.6; }
+  .settlement-item-desc { font-size: 9px; color: var(--text-dim); margin-top: 4px; letter-spacing: 0.1em; }
+
+  .settlement-actions {
+    padding: 16px 20px; display: flex; justify-content: flex-end;
+    border-top: 1px dashed rgba(43,42,38,0.3);
+  }
+
+  /* ============= 沉浸态 · 可控主角 & 移动提示 ============= */
+  .hero-sprite {
+    position: absolute; left: 13%; bottom: 22%;
+    width: 96px; margin-left: -48px;
+    z-index: 7;
+    pointer-events: none;
+    will-change: left, bottom, transform;
+  }
+  .hero-sprite svg { width: 100%; height: auto; display: block; }
+  /* 行走起伏只作用内层，避免与整体缩放/翻转打架 */
+  .hero-body { transform-origin: 50% 92%; }
+  .hero-body.bob { animation: hero-bob .44s ease-in-out infinite; }
+  @keyframes hero-bob {
+    0%, 100% { transform: translateY(0) scaleY(1); }
+    50%      { transform: translateY(-3.5px) scaleY(.982); }
+  }
+
+  .move-hint {
+    position: absolute; left: 24px; bottom: 26px; z-index: 30;
+    display: flex; align-items: center; gap: 6px;
+    padding: 8px 12px;
+    background: rgba(246, 241, 226, 0.92);
+    border: 1px solid rgba(43, 42, 38, 0.35);
+    font-size: 10px; letter-spacing: .16em; color: var(--text-bright);
+    backdrop-filter: blur(4px);
+    transition: border-color .3s ease;
+  }
+  .move-hint .k {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 20px; height: 20px;
+    border: 1px solid rgba(143, 106, 28, 0.55);
+    background: rgba(232, 183, 90, 0.22);
+    color: var(--lamp-deep);
+  }
+  .move-hint .txt { margin-left: 4px; opacity: .85; }
+  .move-hint.urgent { border-color: var(--lamp-deep); animation: hint-pulse 1.1s ease-in-out infinite; }
+  @keyframes hint-pulse { 50% { box-shadow: 0 0 24px rgba(232,183,90,.75); } }
+
+  .objective {
+    position: absolute; right: 24px; bottom: 26px; z-index: 30;
+    display: flex; align-items: center; gap: 8px;
+    padding: 9px 14px;
+    background: rgba(246, 241, 226, 0.92);
+    border: 1px solid rgba(43, 42, 38, 0.35);
+    font-size: 11px; letter-spacing: .14em; color: var(--text-bright);
+    backdrop-filter: blur(4px);
+  }
+  .objective .obj-arrow { color: var(--lamp-deep); animation: arrow-nudge 1.4s ease-in-out infinite; }
+  @keyframes arrow-nudge { 0%,100% { transform: translateX(0); } 50% { transform: translateX(5px); } }
+  .objective.arrived { border-color: #B8860B; color: var(--lamp-deep); }
+  .objective.arrived .obj-arrow { animation: none; }
+
+  /* 走廊尽头救生艇：抵达时点亮的暖光 */
+  #sceneGoalGlow { opacity: 0; transition: opacity .9s ease; }
+  #sceneGoalGlow.on { opacity: 1; }
+
+  /* ============= 过场：雨幕 / 浪涌 / 气泡 / 灯火 ============= */
+  .rain { position: absolute; inset: 0; z-index: 6; pointer-events: none; overflow: hidden; }
+  .rain .drop {
+    position: absolute; top: -16%;
+    width: 2px; height: 54px;
+    background: linear-gradient(180deg, rgba(237,230,211,0), rgba(237,230,211,.55));
+    animation: drop-fall linear infinite;
+  }
+  @keyframes drop-fall {
+    0%   { transform: translate3d(0,-16%,0) rotate(11deg); opacity: 0; }
+    12%  { opacity: .85; }
+    100% { transform: translate3d(-110px,150vh,0) rotate(11deg); opacity: 0; }
+  }
+
+  .swell { transform-box: view-box; transform-origin: 600px 470px; animation: swell-lift 5.6s ease-in-out infinite alternate; }
+  @keyframes swell-lift {
+    0%   { transform: translateY(0) scaleY(1); }
+    100% { transform: translateY(-26px) scaleY(1.12); }
+  }
+
+  .lantern-glow { animation: lantern-flicker 2.3s steps(4) infinite alternate; }
+  @keyframes lantern-flicker {
+    0%   { opacity: .5; }
+    100% { opacity: .88; }
+  }
+
+  .bubbles { position: absolute; inset: 0; z-index: 6; pointer-events: none; overflow: hidden; }
+  .bubbles .bubble {
+    position: absolute; bottom: -6%;
+    border-radius: 50%;
+    border: 2px solid rgba(215, 235, 240, .5);
+    background: radial-gradient(circle at 32% 30%, rgba(244,240,228,.55), rgba(126,147,164,.08) 70%);
+    animation: bubble-rise linear infinite;
+  }
+  @keyframes bubble-rise {
+    0%   { transform: translate3d(0,0,0) scale(.5); opacity: 0; }
+    14%  { opacity: .75; }
+    100% { transform: translate3d(38px,-92vh,0) scale(1.15); opacity: 0; }
+  }
+
+  /* 推镜：分支 A —— 由全景推向水中的母亲 */
+  .cam-a { transform-box: view-box; transform-origin: 600px 380px; }
+  #sceneA.show .cam-a { animation: cam-a 5.4s cubic-bezier(.4,.05,.3,1) forwards; }
+  @keyframes cam-a {
+    0%   { transform: translate(0,0) scale(1); }
+    26%  { transform: translate(232px,-58px) scale(1.18); }
+    62%  { transform: translate(404px,-112px) scale(1.36); }
+    100% { transform: translate(316px,-52px) scale(1.15); }
+  }
+
+  /* 推镜：分支 B —— 缓缓下沉、视野拉远 */
+  .cam-b { transform-box: view-box; transform-origin: 600px 300px; }
+  #sceneB.show .cam-b { animation: cam-b 7.6s ease-in forwards; }
+  @keyframes cam-b {
+    0%   { transform: translate(0,0) scale(1.02); }
+    100% { transform: translate(0,86px) scale(1.24); }
+  }
+
+  /* 字幕节拍：每次刷新重放淡入 */
+  .branch-caption.beat { animation: caption-beat .9s ease; }
+  @keyframes caption-beat {
+    0%   { opacity: 0; transform: translate(-50%, 14px); filter: blur(6px); }
+    100% { opacity: 1; transform: translate(-50%, 0); filter: none; }
+  }
+
+  /* 花屏：RGB 分离撕裂 + 横向撕裂带 */
+  .glitch-overlay .rgb {
+    position: absolute; inset: 0;
+    mix-blend-mode: screen;
+    background:
+      linear-gradient(90deg, rgba(102,217,232,.5) 0 2px, transparent 2px 42px),
+      linear-gradient(90deg, rgba(193,85,74,.5) 0 2px, transparent 2px 58px);
+    animation: rgb-jitter .16s steps(2) infinite;
+  }
+  @keyframes rgb-jitter { 0% { transform: translateX(-6px); } 100% { transform: translateX(7px); } }
+  .glitch-overlay .rip {
+    position: absolute; left: 0; right: 0;
+    background: rgba(236, 240, 241, .85);
+    mix-blend-mode: overlay;
+    animation: rip-skew .24s steps(3) infinite;
+  }
+  @keyframes rip-skew { 0% { transform: translateX(-26px); } 100% { transform: translateX(28px); } }
+
+  /* 警告框震入 */
+  .warning-box.shake-in { animation: warning-in .5s cubic-bezier(.2,.9,.3,1); }
+  @keyframes warning-in {
+    0%   { transform: translate(-50%,-50%) scale(.86) rotate(-1.6deg); filter: blur(3px); }
+    40%  { transform: translate(-50%,-50%) scale(1.04) rotate(.8deg); filter: none; }
+    60%  { transform: translate(-50%,-52%) scale(.99) rotate(-.4deg); }
+    100% { transform: translate(-50%,-50%) scale(1) rotate(0); }
+  }
+
+  /* 分支 B 主画面：RGB 撕裂阶段 */
+  .branch-stage.rgb-split { animation: rgb-split .5s steps(2) infinite; }
+  @keyframes rgb-split {
+    0%   { transform: translate(-4px,1px); filter: hue-rotate(8deg) saturate(1.5); }
+    50%  { transform: translate(5px,-2px); filter: hue-rotate(-14deg) saturate(1.7); }
+    100% { transform: translate(-3px,2px); filter: none; }
+  }
+
+  /* ============= 过场电影黑边 + QTE 互动 UI ============= */
+  .cine-bar {
+    position: absolute; left: 0; right: 0; height: 0;
+    background: #0B0805;
+    z-index: 55; pointer-events: none;
+    transition: height 1.2s cubic-bezier(.4,0,.2,1);
+  }
+  .cine-bar.top { top: 0; }
+  .cine-bar.bot { bottom: 0; }
+  .branch-layer.active .cine-bar { height: 9vh; }
+
+  .qte-ui {
+    position: absolute; left: 50%; bottom: 14%;
+    transform: translateX(-50%);
+    z-index: 58; width: min(560px, 86vw);
+    text-align: center; display: none;
+  }
+  .qte-ui.show { display: block; animation: caption-beat .7s ease; }
+  .qte-title {
+    font-size: 13px; letter-spacing: .18em;
+    color: var(--paper-2);
+    text-shadow: 0 0 12px rgba(0,0,0,.85);
+  }
+  .qte-title .key {
+    display: inline-block; padding: 2px 9px;
+    border: 1px solid rgba(244,240,228,.75);
+    background: rgba(244,240,228,.14);
+    margin: 0 4px; color: #F2D08A;
+  }
+  .qte-bars { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+  .qte-bar {
+    position: relative; height: 14px;
+    background: rgba(11,8,5,.72);
+    border: 1px solid rgba(244,240,228,.4);
+  }
+  .qte-bar .fill { position: absolute; top: 0; left: 0; bottom: 0; width: 0%; }
+  .qte-bar.boat    .fill { background: linear-gradient(90deg, #6F8F7C, #C9B489); }
+  .qte-bar.stamina .fill { background: linear-gradient(90deg, #C1554A, #E8B75A); }
+  .qte-bar.dist    .fill { background: linear-gradient(90deg, #5E7488, #F2D08A); }
+  .qte-label {
+    position: absolute; left: 8px; top: -2px;
+    font-size: 9px; letter-spacing: .22em;
+    color: rgba(244,240,228,.9); line-height: 16px;
+    z-index: 1;
+  }
+
+  /* 划桨水花 */
+  .row-flash {
+    position: absolute; width: 130px; height: 58px;
+    background: radial-gradient(ellipse, rgba(244,240,228,.55), rgba(244,240,228,0) 70%);
+    pointer-events: none; z-index: 8;
+    animation: row-splash .8s ease-out forwards;
+  }
+  @keyframes row-splash {
+    0%   { opacity: .95; transform: scale(.35); }
+    100% { opacity: 0;   transform: scale(1.7); }
+  }
+  .boat-row, .hero-swim { will-change: transform; }
+
+  /* ============= 响应式 / 小屏降级 ============= */
+  @media (max-width: 960px) {
+    .app-root { grid-template-columns: 1fr; grid-template-rows: auto 1fr auto; }
+    .player-panel, .badge-panel { flex-direction: row; flex-wrap: wrap; }
+  }
+  @media (max-width: 620px) {
+    .settlement-grid { grid-template-columns: 1fr; }
+    .soul-question { font-size: 16px; padding: 18px 14px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- 背景装饰层 -->
+<div class="bg-grid"></div>
+<div class="bg-vignette"></div>
+<div class="scanline"></div>
+<div class="scan-beam"></div>
+<div class="grain"></div>
+
+<!-- 主应用 -->
+<div class="app-root">
+
+  <!-- ========== 左侧：玩家状态栏 ========== -->
+  <aside class="panel player-panel">
+    <div class="logo-block">
+      <div class="logo-title">时间典当</div>
+      <div class="logo-sub">TIME PAWN v0.1</div>
+    </div>
+
+    <div class="stat-row">
+      <div class="stat-label">时间币余额</div>
+      <div class="stat-value">
+        <span id="coinDisplay">120</span>
+        <span class="unit">TC</span>
+      </div>
+    </div>
+
+    <div class="stat-row">
+      <div class="stat-label">当前状态</div>
+      <div style="font-size:12px;color:var(--lamp-deep);letter-spacing:0.1em;margin-top:2px;" id="stateLabel">· 待机中 ·</div>
+    </div>
+
+    <button class="btn btn-pawn" id="btnPawn">
+      <span class="btn-corner btn-tl"></span>
+      <span class="btn-corner btn-br"></span>
+      典当通勤时间　+10 TC
+    </button>
+
+    <button class="btn" id="btnOpenScripts" style="border-color:var(--text-dim);color:var(--text-mid);">
+      <span class="btn-corner btn-tl"></span>
+      <span class="btn-corner btn-br"></span>
+      前往剧本兑换
+    </button>
+
+    <div class="log-box" id="logBox">
+      <div style="color:var(--lamp-deep);margin-bottom:6px;">▸ 系统日志</div>
+      <div class="log-entry">欢迎来到时间典当行...</div>
+      <div class="log-entry">您可典当无聊时间换取 TC。</div>
+    </div>
+  </aside>
+
+  <!-- ========== 中间：主内容区 ========== -->
+  <main class="panel main-panel">
+
+    <!-- 屏 1：欢迎界面 -->
+    <section class="screen active" id="screenWelcome">
+      <div class="welcome-title">时间典当</div>
+      <div class="welcome-subtitle">—— 用无聊的时间，换一次活过 ——</div>
+      <div class="welcome-body">
+        这是一家<strong class="hl">不提供赎当</strong>的典当行。<br/><br/>
+        你把每天被白白消耗的时间——通勤、排队、开会、等待——典当成 <span class="hl">时间币 (TC)</span>。<br/>
+        然后，用它兑换一段真实的<span class="hl">历史剧本</span>。<br/><br/>
+        你会亲临 1912 年的大西洋、1989 年的柏林墙、或 2020 年的武汉街头。<br/>
+        不是观看——是<span class="hl">在场</span>。<br/><br/>
+        你可以做出当时没人能做的选择。<br/>
+        代价是：那段被典当的<span class="hl">无聊时间</span>，将永远从你的生命中扣除。
+      </div>
+      <div class="cta-row">
+        <button class="btn" id="btnEnterScripts">
+          <span class="btn-corner btn-tl"></span>
+          <span class="btn-corner btn-br"></span>
+          ▶　开始典当
+        </button>
+        <span style="font-size:11px;color:var(--text-dim);letter-spacing:0.15em;">提示：先点击左侧「典当通勤」攒点 TC</span>
+      </div>
+    </section>
+
+    <!-- 屏 2：剧本兑换 -->
+    <section class="screen" id="screenScripts">
+      <div class="section-head">
+        <div class="section-title">历史剧本库存</div>
+        <div class="section-meta">共 1 / ∞　·　按热度排序</div>
+      </div>
+
+      <!-- 泰坦尼克号剧本卡片 -->
+      <div class="script-card" id="scriptCardTitanic" data-cost="350">
+        <div class="script-thumb">
+          <!-- 扁平插画：暮色海面 + 倾斜船体剪影 + 暖窗灯火 + 救生艇 -->
+          <svg viewBox="0 0 200 150" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="thumbSky" x1="0" x2="0" y1="0" y2="1">
+                <stop offset="0%"   stop-color="#3E5062"/>
+                <stop offset="58%"  stop-color="#6E7F87"/>
+                <stop offset="100%" stop-color="#C9B489"/>
+              </linearGradient>
+              <linearGradient id="thumbSea" x1="0" x2="0" y1="0" y2="1">
+                <stop offset="0%"   stop-color="#4A6B82"/>
+                <stop offset="100%" stop-color="#2C4257"/>
+              </linearGradient>
+              <pattern id="thumbHatch" width="16" height="16" patternUnits="userSpaceOnUse">
+                <path d="M0 0 L16 16 M16 0 L0 16" stroke="#1B1512" stroke-width="1.1" opacity="0.55"/>
+              </pattern>
+            </defs>
+
+            <!-- 暮色天空 -->
+            <rect width="200" height="150" fill="url(#thumbSky)"/>
+            <circle cx="152" cy="32" r="26" fill="#EDE6D3" opacity="0.14"/>
+            <circle cx="152" cy="32" r="17" fill="#F4F0E4" opacity="0.92"/>
+            <!-- 平涂云带 -->
+            <path d="M0 46 Q40 38 78 46 T200 42 L200 58 L0 60 Z" fill="#EDE6D3" opacity="0.16"/>
+            <path d="M0 64 Q56 58 104 66 T200 60 L200 72 L0 72 Z" fill="#EDE6D3" opacity="0.10"/>
+
+            <!-- 海面 -->
+            <rect x="0" y="104" width="200" height="46" fill="url(#thumbSea)"/>
+            <path d="M0 106 Q34 100 68 106 T136 104 T200 106 L200 118 L0 118 Z" fill="#7E93A4" opacity="0.32"/>
+
+            <!-- 倾斜船体：近黑剪影 + 交叉木格 + 暖窗灯火 -->
+            <g transform="rotate(-15 96 96)">
+              <path d="M28 96 L164 96 L178 86 L170 74 L74 74 L56 86 Z" fill="#221B15"/>
+              <rect x="74" y="52" width="80" height="22" fill="#1E1A16"/>
+              <rect x="86" y="38" width="24" height="14" fill="#2B2A26"/>
+              <rect x="120" y="30" width="7" height="22" fill="#1E1A16"/>
+              <rect x="100" y="32" width="6" height="20" fill="#1E1A16"/>
+              <rect x="50" y="84" width="128" height="12" fill="url(#thumbHatch)" opacity="0.85"/>
+              <ellipse cx="98" cy="92" rx="48" ry="12" fill="#E8B75A" opacity="0.18"/>
+              <circle cx="80"  cy="92" r="2" fill="#E8B75A"/>
+              <circle cx="92"  cy="92" r="2" fill="#F2D08A"/>
+              <circle cx="104" cy="92" r="2" fill="#E8B75A"/>
+              <circle cx="116" cy="92" r="2" fill="#F2D08A"/>
+            </g>
+
+            <!-- 救生艇：母亲抱着婴儿的剪影，被灯火勾勒 -->
+            <g transform="translate(156 112)">
+              <ellipse cx="0" cy="8" rx="22" ry="4" fill="#1B1512" opacity="0.6"/>
+              <path d="M-21 4 Q0 -6 21 4 L21 9 L-21 9 Z" fill="#3E3229"/>
+              <ellipse cx="0" cy="-2" rx="20" ry="11" fill="#E8B75A" opacity="0.16"/>
+              <g fill="#2B2A26">
+                <circle cx="-6" cy="-14" r="6"/>
+                <path d="M-13 -8 Q-6 -11 1 -8 L1 4 L-13 4 Z"/>
+                <circle cx="5" cy="-9" r="3"/>
+                <path d="M2 -6 L9 -6 L9 -1 L2 -1 Z"/>
+              </g>
+            </g>
+
+            <!-- 前景暗浪（拉开层次） -->
+            <path d="M0 132 Q50 124 100 132 T200 128 L200 150 L0 150 Z" fill="#1B1512" opacity="0.9"/>
+          </svg>
+        </div>
+        <div class="script-info">
+          <div class="script-name">泰坦尼克号 · 沉没之夜</div>
+          <div class="script-date">1912 年 4 月 15 日 · 北大西洋</div>
+          <div class="script-desc">
+            船体剧烈倾斜，冰冷的海水疯狂涌入走廊。<br/>
+            一艘救生艇只剩一个空位，你旁边，一位母亲正抱着婴儿，绝望地看着你。<br/>
+            <span style="color:var(--lamp-deep);">—— 你的选择将被历史记录。</span>
+          </div>
+          <div class="script-cost-row">
+            <div class="script-cost">消耗 <span class="num">350</span> TC</div>
+            <button class="btn" id="btnExchangeTitanic">
+              <span class="btn-corner btn-tl"></span>
+              <span class="btn-corner btn-br"></span>
+              兑换剧本
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 提示条 -->
+      <div class="toast-hint" id="toastNoCoin">
+        ⚠ 时间币不足，请典当更多生命
+      </div>
+
+      <!-- 占位说明 -->
+      <div style="margin-top:32px;font-size:10px;color:var(--text-dim);letter-spacing:0.15em;">
+        · 其他剧本将于后续版本上架 · 敬请期待 ·
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ========== 右侧：物品/徽章栏 ========== -->
+  <aside class="panel badge-panel">
+    <div class="logo-block" style="border:none;padding:0;">
+      <div class="logo-title" style="font-size:14px;">物品 · 徽章</div>
+      <div class="logo-sub">INVENTORY · BADGES</div>
+    </div>
+
+    <div class="badge-grid" id="badgeGrid">
+      <div class="badge-slot"><span class="lock-icon">🔒</span></div>
+      <div class="badge-slot"><span class="lock-icon">🔒</span></div>
+      <div class="badge-slot"><span class="lock-icon">🔒</span></div>
+      <div class="badge-slot"><span class="lock-icon">🔒</span></div>
+      <div class="badge-slot"><span class="lock-icon">🔒</span></div>
+      <div class="badge-slot"><span class="lock-icon">🔒</span></div>
+      <div class="badge-slot"><span class="lock-icon">🔒</span></div>
+      <div class="badge-slot"><span class="lock-icon">🔒</span></div>
+      <div class="badge-slot"><span class="lock-icon">🔒</span></div>
+    </div>
+
+    <!-- 已获得的实体物品 -->
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <div class="stat-label" style="font-size:9px;">已获得物品 · ITEMS</div>
+      <div class="inv-list" id="itemList"></div>
+      <div id="itemEmptyHint" style="font-size:10px;color:var(--text-dim);letter-spacing:0.1em;">· 暂无物品 ·</div>
+    </div>
+
+    <div class="empty-hint" id="emptyHint">
+      · 尚未解锁任何徽章 ·<br/>
+      每完成一次剧本体验，<br/>
+      你将获得一枚「时间遗痕」。<br/><br/>
+      <span style="color:var(--lamp-deep);">— 生命不会重来 —</span><br/>
+      <span style="color:var(--lamp-deep);">— 但可以活多次 —</span>
+    </div>
+  </aside>
+</div>
+
+
+<!-- ========== 全屏沉浸体验层 ========== -->
+<div class="immersive-screen" id="immersiveScreen">
+
+  <div class="hud-top">
+    <span class="sys-label">▸ SYS: MEMORY INJECTION v0.1 / RUNNING</span>
+    <span class="sys-label" id="hudWater">水位 0%</span>
+    <span class="sys-label" id="hudCoinDisplay">TC: 120</span>
+    <span class="sys-label">【 ESC 退出体验舱 】</span>
+  </div>
+
+  <!-- 倾斜船体 + 走廊场景 -->
+  <div class="ship-wrapper">
+    <div class="player-layer" id="playerLayer">
+      <!-- 走廊 SVG 场景：扁平插画风（苔绿墙面 + 交叉木梁 + 暖灯焰 + 板岩色海光） -->
+      <svg class="ship-scene" viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="wallSage" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%"   stop-color="#4E6857"/>
+            <stop offset="62%"  stop-color="#3E5445"/>
+            <stop offset="100%" stop-color="#2A3830"/>
+          </linearGradient>
+          <linearGradient id="floorWood" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%"   stop-color="#3A2E22"/>
+            <stop offset="100%" stop-color="#221B15"/>
+          </linearGradient>
+          <linearGradient id="seaGlass" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%"   stop-color="#9CB0BD"/>
+            <stop offset="58%"  stop-color="#5E7488"/>
+            <stop offset="100%" stop-color="#3E5A70"/>
+          </linearGradient>
+          <linearGradient id="archGlow" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%"   stop-color="#F4F0E4" stop-opacity="0.96"/>
+            <stop offset="46%"  stop-color="#C9B489" stop-opacity="0.58"/>
+            <stop offset="100%" stop-color="#4A6B82" stop-opacity="0.30"/>
+          </linearGradient>
+          <radialGradient id="lampPool" cx="50%" cy="50%" r="50%">
+            <stop offset="0%"   stop-color="#F2D08A" stop-opacity="0.55"/>
+            <stop offset="42%"  stop-color="#E8B75A" stop-opacity="0.20"/>
+            <stop offset="100%" stop-color="#E8B75A" stop-opacity="0"/>
+          </radialGradient>
+          <!-- 交叉木格：参考图护墙板上的 X 形梁 -->
+          <pattern id="hatchBig" width="200" height="200" patternUnits="userSpaceOnUse">
+            <path d="M0 0 L200 200 M200 0 L0 200" stroke="#171310" stroke-width="3" opacity="0.34"/>
+          </pattern>
+          <pattern id="hatchSml" width="84" height="84" patternUnits="userSpaceOnUse">
+            <path d="M0 0 L84 84 M84 0 L0 84" stroke="#120E0B" stroke-width="2.4" opacity="0.52"/>
+          </pattern>
+        </defs>
+
+        <!-- ===== 墙面：苔绿平涂 + 交叉木格 ===== -->
+        <rect width="1920" height="1080" fill="url(#wallSage)"/>
+        <rect width="1920" height="1080" fill="url(#hatchBig)"/>
+
+        <!-- 天花板：近黑 + 横梁 -->
+        <rect x="0" y="0" width="1920" height="132" fill="#1B1713"/>
+        <g fill="#2A211B">
+          <rect x="150" y="0" width="40" height="132"/>
+          <rect x="550" y="0" width="40" height="132"/>
+          <rect x="950" y="0" width="40" height="132"/>
+          <rect x="1350" y="0" width="40" height="132"/>
+          <rect x="1750" y="0" width="40" height="132"/>
+        </g>
+        <rect x="0" y="126" width="1920" height="16" fill="#241C14"/>
+
+        <!-- 护墙板：深木 + 密集交叉木格 -->
+        <rect x="0" y="616" width="1920" height="200" fill="#33291E"/>
+        <rect x="0" y="616" width="1920" height="200" fill="url(#hatchSml)"/>
+        <rect x="0" y="612" width="1920" height="10" fill="#1B1512"/>
+
+        <!-- 地板：轻微透视的木板 -->
+        <rect x="0" y="816" width="1920" height="264" fill="url(#floorWood)"/>
+        <g stroke="#120D08" stroke-width="2.4" opacity="0.5">
+          <line x1="0" y1="880"  x2="1920" y2="880"/>
+          <line x1="0" y1="950"  x2="1920" y2="950"/>
+          <line x1="0" y1="1024" x2="1920" y2="1024"/>
+          <line x1="960" y1="816" x2="200"  y2="1080"/>
+          <line x1="960" y1="816" x2="620"  y2="1080"/>
+          <line x1="960" y1="816" x2="1060" y2="1080"/>
+          <line x1="960" y1="816" x2="1500" y2="1080"/>
+          <line x1="960" y1="816" x2="1900" y2="1064"/>
+        </g>
+        <!-- 地板湿反光 -->
+        <path d="M0 942 Q960 902 1920 942 L1920 1080 L0 1080 Z" fill="#5E7488" opacity="0.15"/>
+
+        <!-- ===== 竖梁（走廊节奏） ===== -->
+        <g fill="#241C14">
+          <rect x="88"   y="132" width="26" height="684"/>
+          <rect x="418"  y="132" width="26" height="684"/>
+          <rect x="748"  y="132" width="26" height="684"/>
+          <rect x="1078" y="132" width="26" height="684"/>
+          <rect x="1408" y="132" width="26" height="684"/>
+        </g>
+
+        <!-- ===== 舷窗 / 拱窗（板岩色海 + 奶白月） ===== -->
+        <g>
+          <path d="M200 560 L200 392 A62 62 0 0 1 324 392 L324 560 Z" fill="url(#seaGlass)"/>
+          <path d="M200 560 L200 392 A62 62 0 0 1 324 392 L324 560" fill="none" stroke="#241C14" stroke-width="12"/>
+          <circle cx="248" cy="440" r="17" fill="#F4F0E4" opacity="0.85"/>
+
+          <path d="M530 560 L530 392 A62 62 0 0 1 654 392 L654 560 Z" fill="url(#seaGlass)"/>
+          <path d="M530 560 L530 392 A62 62 0 0 1 654 392 L654 560" fill="none" stroke="#241C14" stroke-width="12"/>
+
+          <path d="M860 560 L860 392 A62 62 0 0 1 984 392 L984 560 Z" fill="url(#seaGlass)"/>
+          <path d="M860 560 L860 392 A62 62 0 0 1 984 392 L984 560" fill="none" stroke="#241C14" stroke-width="12"/>
+          <circle cx="910" cy="436" r="15" fill="#F4F0E4" opacity="0.7"/>
+
+          <path d="M1190 560 L1190 392 A62 62 0 0 1 1314 392 L1314 560 Z" fill="url(#seaGlass)"/>
+          <path d="M1190 560 L1190 392 A62 62 0 0 1 1314 392 L1314 560" fill="none" stroke="#241C14" stroke-width="12"/>
+        </g>
+
+        <!-- ===== 吊灯：暖光池（灯焰摇曳） ===== -->
+        <g>
+          <g transform="translate(262 190)">
+            <rect x="-4" y="-58" width="8" height="58" fill="#241C14"/>
+            <ellipse class="lantern-glow" cx="0" cy="86" rx="240" ry="228" fill="url(#lampPool)"/>
+            <path d="M-19 0 L19 0 L15 34 L-15 34 Z" fill="#2A211B"/>
+            <rect x="-10" y="5" width="20" height="24" fill="#F2D08A"/>
+          </g>
+          <g transform="translate(592 190)">
+            <rect x="-4" y="-58" width="8" height="58" fill="#241C14"/>
+            <ellipse class="lantern-glow" cx="0" cy="86" rx="240" ry="228" fill="url(#lampPool)"/>
+            <path d="M-19 0 L19 0 L15 34 L-15 34 Z" fill="#2A211B"/>
+            <rect x="-10" y="5" width="20" height="24" fill="#F2D08A"/>
+          </g>
+          <g transform="translate(922 190)">
+            <rect x="-4" y="-58" width="8" height="58" fill="#241C14"/>
+            <ellipse class="lantern-glow" cx="0" cy="86" rx="240" ry="228" fill="url(#lampPool)"/>
+            <path d="M-19 0 L19 0 L15 34 L-15 34 Z" fill="#2A211B"/>
+            <rect x="-10" y="5" width="20" height="24" fill="#F2D08A"/>
+          </g>
+          <g transform="translate(1252 190">
+            <rect x="-4" y="-58" width="8" height="58" fill="#241C14"/>
+            <ellipse class="lantern-glow" cx="0" cy="86" rx="240" ry="228" fill="url(#lampPool)"/>
+            <path d="M-19 0 L19 0 L15 34 L-15 34 Z" fill="#2A211B"/>
+            <rect x="-10" y="5" width="20" height="24" fill="#F2D08A"/>
+          </g>
+          <g transform="translate(1660 260)">
+            <rect x="-4" y="-58" width="8" height="58" fill="#241C14"/>
+            <ellipse class="lantern-glow" cx="0" cy="120" rx="300" ry="270" fill="url(#lampPool)"/>
+            <path d="M-19 0 L19 0 L15 34 L-15 34 Z" fill="#2A211B"/>
+            <rect x="-10" y="5" width="20" height="24" fill="#F2D08A"/>
+          </g>
+        </g>
+
+        <!-- ===== 左端：被撞开的破口，海水正涌进来 ===== -->
+        <g>
+          <rect x="0" y="132" width="88" height="684" fill="#120F0C"/>
+          <path d="M88 300 Q44 300 26 420 Q8 560 0 700 L0 816 L88 816 Z" fill="#1B1512"/>
+          <path d="M0 690 Q44 656 88 690 L88 816 L0 816 Z" fill="#3E5A70" opacity="0.7"/>
+          <path d="M0 686 Q44 652 88 686" fill="none" stroke="#9CB0BD" stroke-width="4" opacity="0.55"/>
+        </g>
+
+        <!-- ===== 右端：通往舷侧的出口，救生艇与母亲 ===== -->
+        <g>
+          <path d="M1470 816 L1470 420 A240 240 0 0 1 1950 420 L1950 816 Z" fill="url(#archGlow)"/>
+          <!-- 海与月 -->
+          <rect x="1470" y="644" width="480" height="172" fill="#3E5A70"/>
+          <path d="M1470 652 Q1710 626 1950 652 L1950 704 L1470 704 Z" fill="#5E7488" opacity="0.55"/>
+          <circle cx="1808" cy="486" r="86" fill="#EDE6D3" opacity="0.12"/>
+          <circle cx="1808" cy="486" r="54" fill="#F4F0E4" opacity="0.9"/>
+          <!-- 救生艇（挂在舷侧，只剩一个空位） -->
+          <g transform="translate(1666 706) rotate(-6)">
+            <path d="M-100 8 Q0 -28 100 8 L100 22 L-100 22 Z" fill="#3E3229"/>
+            <path d="M-100 8 Q0 -28 100 8" fill="none" stroke="#241C14" stroke-width="9"/>
+            <ellipse cx="-32" cy="2" rx="36" ry="13" fill="#E8B75A" opacity="0.22"/>
+          </g>
+          <!-- 母亲与婴儿剪影 -->
+          <g fill="#2B2A26">
+            <circle cx="1552" cy="646" r="21"/>
+            <path d="M1527 676 Q1552 665 1577 676 L1577 722 L1527 722 Z"/>
+            <circle cx="1582" cy="684" r="11"/>
+            <path d="M1572 694 L1592 694 L1592 714 L1572 714 Z"/>
+          </g>
+          <!-- 拱门木框 -->
+          <path d="M1470 816 L1470 420 A240 240 0 0 1 1950 420 L1950 816" fill="none" stroke="#241C14" stroke-width="24"/>
+          <!-- 抵达时亮起的暖光 -->
+          <ellipse id="sceneGoalGlow" cx="1700" cy="600" rx="320" ry="250" fill="#E8B75A" fill-opacity="0.34"/>
+        </g>
+
+        <!-- ===== 漂浮的杂物 ===== -->
+        <g fill="#3E3229" opacity="0.8">
+          <rect x="252" y="1012" width="62" height="10" transform="rotate(-6 283 1017)"/>
+          <rect x="632" y="1034" width="44" height="8" transform="rotate(8 654 1038)"/>
+          <rect x="1262" y="1050" width="52" height="9" transform="rotate(-4 1288 1054)"/>
+        </g>
+
+        <!-- ===== 应急灯（一闪一闪） ===== -->
+        <g class="blink-lights">
+          <rect x="96"  y="374" width="16" height="5" fill="#C1554A"/>
+          <rect x="1424" y="374" width="16" height="5" fill="#C1554A"/>
+        </g>
+      </svg>
+    </div>
+
+    <!-- 海水层（高度由 JS 逐帧驱动） -->
+    <div class="water-layer" id="waterLayer">
+      <div class="water-ripples"></div>
+    </div>
+
+    <!-- 可控主角（WASD / 方向键 / 点击地面走动） -->
+    <div class="hero-sprite" id="heroSprite">
+      <div class="hero-body" id="heroBody">
+        <svg viewBox="0 0 96 150" xmlns="http://www.w3.org/2000/svg">
+          <!-- 落地影子 -->
+          <ellipse cx="48" cy="144" rx="27" ry="6" fill="#120D08" opacity="0.45"/>
+          <!-- 靴子 -->
+          <path d="M35 144 L35 127 Q35 124 38 124 L45 124 L45 144 Z" fill="#171310"/>
+          <path d="M55 144 L55 124 L62 124 Q65 124 65 127 L65 144 Z" fill="#171310"/>
+          <!-- 长大衣：有体量的躯干 -->
+          <path d="M29 130 L30 80 Q33 63 48 61 Q63 63 66 80 L67 130 Q48 122 29 130 Z" fill="#3E3229"/>
+          <!-- 大衣下摆暗部 -->
+          <path d="M29 130 Q48 122 67 130 L67 121 Q48 114 29 121 Z" fill="#2B2A26"/>
+          <!-- 衬衫前襟 -->
+          <path d="M48 63 L48 120" stroke="#F4F0E4" stroke-width="2.2" opacity="0.55"/>
+          <!-- 斜挎包带 + 小包 -->
+          <path d="M35 76 L60 106" stroke="#C9B489" stroke-width="5" opacity="0.9"/>
+          <rect x="53" y="102" width="17" height="15" rx="2.5" fill="#8A6A3C"/>
+          <rect x="53" y="102" width="17" height="4" rx="2" fill="#6E5330"/>
+          <!-- 砖红色围巾 -->
+          <path d="M36 57 Q48 66 60 57 L60 66 Q48 74 36 66 Z" fill="#C1554A"/>
+          <path d="M58 60 L63 84 L54 87 L51 64 Z" fill="#C1554A"/>
+          <path d="M54 84 L62 82" stroke="#A03D33" stroke-width="2.4"/>
+          <!-- 手臂 + 手 -->
+          <path d="M31 74 L24 101" stroke="#3E3229" stroke-width="10" stroke-linecap="round"/>
+          <path d="M65 74 L72 101" stroke="#3E3229" stroke-width="10" stroke-linecap="round"/>
+          <circle cx="23.5" cy="103" r="4.6" fill="#E8C9A6"/>
+          <circle cx="72.5" cy="103" r="4.6" fill="#E8C9A6"/>
+          <!-- 头：暖肤色 + 深色头发色块 -->
+          <circle cx="48" cy="38" r="17" fill="#E8C9A6"/>
+          <path d="M31 40 Q28 17 48 16 Q68 17 65 40 Q63 27 53 26 Q56 33 50 35 Q45 24 37 30 Q33 33 31 40 Z" fill="#2B2A26"/>
+          <!-- 朝向行进方向的眼睛 -->
+          <circle cx="55" cy="41" r="2.1" fill="#171310"/>
+          <!-- 右侧暖色边缘光 -->
+          <path d="M64.5 40 Q66 64 68 98" stroke="#F2D08A" stroke-width="3" opacity="0.55" fill="none"/>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- 移动提示 / 目标提示 -->
+  <div class="move-hint" id="moveHint">
+    <span class="k">W</span><span class="k">A</span><span class="k">S</span><span class="k">D</span>
+    <span class="txt">移动 · 或点击地面</span>
+  </div>
+  <div class="objective" id="objective">
+    <span class="obj-arrow">▶</span> 目标：走廊尽头的救生艇
+  </div>
+
+  <!-- 边缘蓝色洪水遮罩 -->
+  <div class="edge-flood" id="edgeFlood"></div>
+
+  <!-- 打字机叙述框 -->
+  <div class="narrative-box" id="narrativeBox" style="opacity:0;">
+    <span id="typewriterText" class="cursor-blink"></span>
+  </div>
+</div>
+
+
+<!-- ========== 系统提示框（历史冲突节点） ========== -->
+<div class="system-modal-backdrop" id="systemModal">
+  <div class="system-modal">
+    <div class="modal-title">▸ SYS · 历史冲突节点</div>
+    <div class="modal-body">
+      <div class="prompt-text" id="promptText">
+        检测到历史冲突节点，请做出选择：
+      </div>
+      <div style="font-size:10px;color:var(--text-dim);letter-spacing:0.15em;line-height:2;margin-top:14px;">
+        节点号　1912-04-15 / 02:10　·　北大西洋 41°43′N　49°56′W<br/>
+        可选路径　2 / 2　·　一经提交，不可撤回
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" id="btnChoiceA">
+        <span class="btn-corner btn-tl"></span>
+        <span class="btn-corner btn-br"></span>
+        A. 坐上救生艇（冷漠／自保）
+      </button>
+      <button class="btn" id="btnChoiceB" style="border-color:var(--danger);color:var(--danger);">
+        <span class="btn-corner btn-tl"></span>
+        <span class="btn-corner btn-br"></span>
+        B. 让座（英雄／牺牲）
+      </button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ========== 分支过场层（A 落座 / B 花屏溺水） ========== -->
+<div class="branch-layer" id="branchLayer">
+
+  <!-- 电影黑边 -->
+  <div class="cine-bar top"></div>
+  <div class="cine-bar bot"></div>
+
+  <!-- 分支 A 场景：坐上救生艇（三拍推镜 + 雨幕 + 浪涌 + 灯火） -->
+  <div class="branch-scene" id="sceneA">
+    <div class="branch-stage" id="branchStageA">
+      <svg viewBox="0 0 1200 675" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="duskA" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%"   stop-color="#2B3A48"/>
+            <stop offset="46%"  stop-color="#4E6270"/>
+            <stop offset="78%"  stop-color="#8A9AA0"/>
+            <stop offset="100%" stop-color="#C9B489"/>
+          </linearGradient>
+          <linearGradient id="seaA" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%"   stop-color="#5E7488"/>
+            <stop offset="45%"  stop-color="#3E5A70"/>
+            <stop offset="100%" stop-color="#1B2A36"/>
+          </linearGradient>
+          <pattern id="deckHatch" width="46" height="46" patternUnits="userSpaceOnUse">
+            <path d="M0 0 L46 46 M46 0 L0 46" stroke="#0F0C09" stroke-width="2" opacity="0.5"/>
+          </pattern>
+          <radialGradient id="moonHalo" cx="50%" cy="50%" r="50%">
+            <stop offset="0%"   stop-color="#F4F0E4" stop-opacity="0.34"/>
+            <stop offset="100%" stop-color="#F4F0E4" stop-opacity="0"/>
+          </radialGradient>
+        </defs>
+
+        <rect width="1200" height="675" fill="#0F0C09"/>
+        <g class="cam-a">
+          <!-- 暮色天空 -->
+          <rect width="1200" height="675" fill="url(#duskA)"/>
+          <circle cx="905" cy="150" r="130" fill="url(#moonHalo)"/>
+          <circle cx="905" cy="150" r="46" fill="#F4F0E4" opacity="0.9"/>
+          <path d="M0 196 Q180 172 360 194 T760 186 T1200 178 L1200 226 L0 236 Z" fill="#EDE6D3" opacity="0.14"/>
+          <path d="M0 250 Q240 232 480 252 T960 240 T1200 234 L1200 268 L0 274 Z" fill="#EDE6D3" opacity="0.09"/>
+
+          <!-- 海面（两层浪涌，缓慢起伏） -->
+          <rect x="0" y="392" width="1200" height="283" fill="url(#seaA)"/>
+          <path class="swell" d="M0 404 Q150 380 300 402 T600 396 T900 400 T1200 392 L1200 470 Q900 448 600 458 T0 452 Z" fill="#7E93A4" opacity="0.30"/>
+          <path class="swell" style="animation-duration:7.4s" d="M0 452 Q170 432 340 452 T680 444 T1200 436 L1200 508 Q680 492 340 500 T0 500 Z" fill="#4A6B82" opacity="0.45"/>
+
+          <!-- 倾斜下沉的船体：近黑剪影 + 交叉木格 + 残余暖窗 -->
+          <g transform="translate(-40 340) rotate(-7)">
+            <path d="M0 96 L640 60 L742 30 L736 8 L60 40 Z" fill="#241C14"/>
+            <path d="M40 48 L700 -2 L700 46 L60 84 Z" fill="#1B1512"/>
+            <rect x="60" y="-56" width="620" height="56" fill="#241C14"/>
+            <rect x="200" y="-118" width="120" height="66" fill="#1B1512"/>
+            <rect x="120" y="-96" width="30" height="88" fill="#1B1512"/>
+            <rect x="520" y="-92" width="28" height="86" fill="#1B1512"/>
+            <rect x="20" y="30" width="680" height="60" fill="url(#deckHatch)" opacity="0.85"/>
+            <ellipse cx="240" cy="44" rx="230" ry="70" fill="#E8B75A" opacity="0.13"/>
+            <circle cx="150" cy="50" r="6" fill="#F2D08A" opacity="0.85"/>
+            <circle cx="250" cy="52" r="6" fill="#E8B75A" opacity="0.7"/>
+            <circle cx="360" cy="52" r="6" fill="#F2D08A" opacity="0.55"/>
+            <circle cx="470" cy="52" r="6" fill="#241C14"/>
+          </g>
+
+          <!-- 救生艇：唯一空位已被玩家占据（可划动） -->
+          <g id="boatRow">
+            <g transform="translate(770 430) rotate(-7)">
+              <path d="M-170 30 Q0 -22 170 30 L170 48 L-170 48 Z" fill="#3E3229"/>
+              <path d="M-170 30 Q0 -22 170 30" fill="none" stroke="#241C14" stroke-width="12"/>
+              <path d="M-166 40 L166 40" stroke="#2A211B" stroke-width="5"/>
+              <ellipse cx="-40" cy="-6" rx="46" ry="18" fill="#E8B75A" opacity="0.16"/>
+              <g fill="#2B2A26">
+                <circle cx="-40" cy="-40" r="19"/>
+                <path d="M-62 -14 Q-40 -24 -18 -14 L-18 30 L-62 30 Z"/>
+              </g>
+              <!-- 暖色边缘光：被艇灯照亮的一侧 -->
+              <path d="M-18 -14 L-18 30" stroke="#F2D08A" stroke-width="5" opacity="0.7"/>
+              <rect x="-250" y="-16" width="270" height="10" rx="5" fill="#3E3229" transform="rotate(16 -40 -6)"/>
+              <ellipse class="lantern-glow" cx="150" cy="4" rx="130" ry="100" fill="#E8B75A" fill-opacity="0.22"/>
+              <circle cx="150" cy="4" r="9" fill="#F2D08A"/>
+            </g>
+          </g>
+
+          <!-- 水中的母亲与婴儿：留在了原地 -->
+          <g>
+            <ellipse cx="330" cy="470" rx="128" ry="30" fill="#7E93A4" opacity="0.18"/>
+            <ellipse cx="330" cy="472" rx="104" ry="22" fill="#1B2A36" opacity="0.85"/>
+            <g fill="#14100C">
+              <circle cx="308" cy="418" r="20"/>
+              <path d="M284 444 Q308 434 332 444 L332 486 L284 486 Z"/>
+              <circle cx="348" cy="428" r="10"/>
+              <path d="M339 438 L357 438 L357 462 L339 462 Z"/>
+            </g>
+            <path d="M336 430 L392 396" stroke="#14100C" stroke-width="9" stroke-linecap="round"/>
+            <path d="M392 396 L406 386" stroke="#F2D08A" stroke-width="4" stroke-linecap="round" opacity="0.5"/>
+          </g>
+
+          <!-- 前景暗浪（拉开层次） -->
+          <path d="M0 604 Q200 574 400 600 T800 592 T1200 586 L1200 675 L0 675 Z" fill="#0F0C09" opacity="0.92"/>
+        </g>
+      </svg>
+      <!-- 雨幕 -->
+      <div class="rain" id="rainA"></div>
+      <div class="branch-water" id="branchWater"></div>
+      <!-- 划桨 QTE -->
+      <div class="qte-ui" id="rowUI">
+        <div class="qte-title">交替按 <span class="key">A</span><span class="key">D</span> 划桨 · 或点击画面</div>
+        <div class="qte-bars">
+          <div class="qte-bar boat"><span class="qte-label">驶离沉船</span><div class="fill" id="rowProgFill"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 分支 B 场景：坠入海中（缓缓下沉 + 气泡上升） -->
+  <div class="branch-scene" id="sceneB">
+    <div class="branch-stage" id="branchStageB">
+      <svg viewBox="0 0 1200 675" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="deepB" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%"   stop-color="#9CB0BD"/>
+            <stop offset="18%"  stop-color="#5E7488"/>
+            <stop offset="52%"  stop-color="#2C4257"/>
+            <stop offset="100%" stop-color="#0B1219"/>
+          </linearGradient>
+          <linearGradient id="shaftB" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%"   stop-color="#F4F0E4" stop-opacity="0.34"/>
+            <stop offset="100%" stop-color="#F4F0E4" stop-opacity="0"/>
+          </linearGradient>
+          <pattern id="seaHatch" width="60" height="60" patternUnits="userSpaceOnUse">
+            <path d="M0 0 L60 60 M60 0 L0 60" stroke="#0B1219" stroke-width="2" opacity="0.26"/>
+          </pattern>
+        </defs>
+
+        <rect width="1200" height="675" fill="#0B1219"/>
+        <g class="cam-b">
+          <rect width="1200" height="675" fill="url(#deepB)"/>
+          <rect width="1200" height="675" fill="url(#seaHatch)"/>
+
+          <!-- 水面透下的光柱（下沉时整体远去） -->
+          <g id="shaftGroup">
+            <polygon points="330,0 470,0 620,675 380,675" fill="url(#shaftB)"/>
+            <polygon points="700,0 800,0 900,675 740,675" fill="url(#shaftB)" opacity="0.6"/>
+            <ellipse cx="600" cy="0" rx="520" ry="120" fill="#F4F0E4" opacity="0.12"/>
+          </g>
+
+          <!-- 搜救探照灯：depth-2 从头顶扫过，没有找到你 -->
+          <polygon id="searchlight" points="500,-30 700,-30 800,300 400,300" fill="url(#shaftB)"/>
+
+          <!-- 远处的船影，越来越远 -->
+          <g id="shipAbove">
+            <g transform="translate(600 -30) scale(0.34)" opacity="0.4" fill="#0B1219">
+              <path d="M-260 150 L260 150 L216 116 L-216 116 Z"/>
+              <rect x="-60" y="70" width="220" height="46"/>
+              <rect x="150" y="46" width="34" height="70"/>
+              <circle cx="110" cy="96" r="7" fill="#E8B75A" opacity="0.8"/>
+            </g>
+          </g>
+
+          <!-- 下沉的你：剪影 + 一道正在熄灭的暖边（可游动；溺水时分层翻转/下沉/冒泡） -->
+          <g id="heroSwim">
+            <g id="heroSink">
+              <g id="heroPose">
+                <ellipse class="hero-shadow" cx="600" cy="360" rx="86" ry="30" fill="#0B1219" opacity="0.4"/>
+                <g fill="#14100C">
+                  <circle cx="600" cy="300" r="36"/>
+                  <path d="M556 344 Q600 332 644 344 L644 418 L556 418 Z"/>
+                </g>
+                <path class="arm-l" d="M560 356 L500 300" fill="none" stroke="#14100C" stroke-width="16" stroke-linecap="round"/>
+                <path class="arm-r" d="M640 356 L700 296" fill="none" stroke="#14100C" stroke-width="16" stroke-linecap="round"/>
+                <path class="rim-glow" d="M636 272 A36 36 0 0 1 636 328" fill="none" stroke="#F2D08A" stroke-width="5" opacity="0.5"/>
+              </g>
+              <!-- 尾流气泡：溺水时从头顶持续涌出 -->
+              <g id="heroBubbles" fill="#DCE9F2">
+                <circle cx="592" cy="272" r="4"/>
+                <circle cx="606" cy="262" r="3"/>
+                <circle cx="584" cy="252" r="5"/>
+                <circle cx="598" cy="244" r="3.4"/>
+                <circle cx="588" cy="234" r="2.6"/>
+                <circle cx="608" cy="228" r="4.2"/>
+                <circle cx="596" cy="218" r="3"/>
+                <circle cx="586" cy="208" r="2.4"/>
+              </g>
+            </g>
+          </g>
+
+          <!-- 漂走的围巾：depth-1 脱落，身上最后一点颜色先离开你 -->
+          <path id="scarfFloat" d="M556 296 Q578 284 596 292 Q614 300 622 318 Q628 334 620 350 Q612 364 594 366 Q600 348 592 332 Q582 314 564 310 Q554 306 556 296 Z" fill="#C1554A"/>
+
+          <!-- 下沉的碎片（远处的求生目标） -->
+          <g id="debrisSwim">
+            <g fill="#2C4257" opacity="0.6">
+              <rect x="250" y="540" width="70" height="9" transform="rotate(-8 285 545)"/>
+              <rect x="880" y="500" width="56" height="8" transform="rotate(10 908 504)"/>
+              <rect x="430" y="620" width="90" height="10" transform="rotate(4 475 625)"/>
+            </g>
+          </g>
+
+          <!-- 下沉时向上漂走的浮木（相对运动视差） -->
+          <g id="fallDebris" fill="#2C4257">
+            <g><rect x="150" y="560" width="84" height="10" transform="rotate(-10 192 565)"/></g>
+            <g><rect x="760" y="600" width="66" height="9" transform="rotate(12 793 604)"/></g>
+            <g><rect x="420" y="640" width="96" height="11" transform="rotate(3 468 645)"/></g>
+            <g><rect x="940" y="540" width="58" height="8" transform="rotate(-16 969 544)"/></g>
+            <g><rect x="300" y="620" width="72" height="9" transform="rotate(8 336 624)"/></g>
+          </g>
+
+          <!-- 海底暗部 -->
+          <path d="M0 640 Q300 604 600 632 T1200 620 L1200 675 L0 675 Z" fill="#0B1219" opacity="0.9"/>
+
+          <!-- 海洋雪微粒（JS 生成，越深越明显） -->
+          <g id="marineSnow" fill="#DCE9F2"></g>
+
+          <!-- 深处的鱼群剪影：depth-2 漠然路过 -->
+          <g id="fishGroup" fill="#0B1219">
+            <g><path d="M240 260 q18 -10 36 0 q-18 10 -36 0 Z M276 260 l14 -8 l0 16 Z"/></g>
+            <g><path d="M180 420 q14 -8 28 0 q-14 8 -28 0 Z M208 420 l11 -6 l0 12 Z"/></g>
+            <g><path d="M320 330 q20 -11 40 0 q-20 11 -40 0 Z M360 330 l15 -9 l0 18 Z"/></g>
+          </g>
+
+          <!-- 深水浮游微光（depth-2 才浮现） -->
+          <g id="plankton" fill="#AFC4D2">
+            <circle cx="140" cy="180" r="1.8"/>
+            <circle cx="260" cy="420" r="1.4"/>
+            <circle cx="380" cy="90" r="2.2"/>
+            <circle cx="520" cy="330" r="1.2"/>
+            <circle cx="640" cy="520" r="2"/>
+            <circle cx="730" cy="150" r="1.6"/>
+            <circle cx="840" cy="470" r="1.3"/>
+            <circle cx="930" cy="260" r="2.4"/>
+            <circle cx="1040" cy="560" r="1.5"/>
+            <circle cx="1120" cy="120" r="1.9"/>
+            <circle cx="80" cy="600" r="2.1"/>
+            <circle cx="460" cy="230" r="1.1"/>
+          </g>
+
+          <!-- 深度暗幕（层层压下来） -->
+          <rect id="darkVeil" width="1200" height="675" fill="#050A10"/>
+
+          <!-- 点击涟漪层（最顶层） -->
+          <g id="waveLayer"></g>
+        </g>
+      </svg>
+      <!-- 上升的气泡 -->
+      <div class="bubbles" id="bubblesB"></div>
+      <!-- 心跳暗角 -->
+      <div class="pulse-vignette"></div>
+      <!-- 求生 QTE -->
+      <div class="qte-ui" id="swimUI">
+        <div class="qte-title">求生本能：快速连按 <span class="key">空格</span> · 或点击画面游向木板</div>
+        <div class="qte-bars">
+          <div class="qte-bar stamina"><span class="qte-label">体力</span><div class="fill" id="swimStamFill"></div></div>
+          <div class="qte-bar dist"><span class="qte-label">距离木板</span><div class="fill" id="swimDistFill"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 花屏 / 马赛克撕裂层 -->
+  <div class="glitch-overlay" id="glitchOverlay">
+    <div class="rgb"></div>
+    <div class="band"></div>
+    <div id="mosaicLayer" style="position:absolute;inset:0;"></div>
+  </div>
+
+  <!-- 黑场 -->
+  <div class="black-curtain" id="blackCurtain"></div>
+
+  <!-- 分支字幕 -->
+  <div class="branch-caption" id="branchCaption"></div>
+
+  <!-- 强制剥离警告 -->
+  <div class="warning-box" id="warningBox">
+    <div class="warning-icon">⚠</div>
+    <div class="warning-text" id="warningText"></div>
+  </div>
+</div>
+
+
+<!-- ========== 结算界面 ========== -->
+<div class="settlement-backdrop" id="settlementBackdrop">
+  <div class="settlement-wrap">
+
+    <div class="soul-question" id="soulQuestion"></div>
+
+    <div class="settlement-card">
+      <div class="settlement-top">
+        <span class="settlement-tag" id="settlementTag">▸ SETTLEMENT</span>
+        <span class="settlement-branch" id="settlementBranch">分支</span>
+      </div>
+
+      <div class="settlement-grid">
+        <div class="settlement-col">
+          <div class="settlement-label">时间币变动</div>
+          <div class="settlement-coin" id="settlementCoin">+0</div>
+          <div class="settlement-note" id="settlementNote"></div>
+        </div>
+        <div class="settlement-col">
+          <div class="settlement-label" id="settlementItemLabel">获得物品</div>
+          <div class="settlement-item" id="settlementItem"></div>
+        </div>
+      </div>
+
+      <div class="settlement-actions">
+        <button class="btn" id="btnBackHome">
+          <span class="btn-corner btn-tl"></span>
+          <span class="btn-corner btn-br"></span>
+          返回主界面
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<script>
+/* ============================================================
+   时间典当 · 核心逻辑（原生 JS）
+   ============================================================ */
+
+// ---------- 状态机 ----------
+const STATES = {
+  WELCOME: 'WELCOME',
+  SCRIPTS: 'SCRIPTS',
+  IMMERSIVE: 'IMMERSIVE',
+  SYSTEM_PROMPT: 'SYSTEM_PROMPT',
+  BRANCH: 'BRANCH',           // 分支过场：A 落座黑场 / B 花屏溺水
+  WARNING: 'WARNING',         // 强制剥离神经链接警告
+  SETTLEMENT: 'SETTLEMENT'    // 结算界面
+};
+
+const game = {
+  coins: 120,
+  state: STATES.WELCOME,
+  granted: []    // 已发放的物品 / 徽章 id
+};
+
+// ---------- DOM 引用 ----------
+const $ = id => document.getElementById(id);
+const coinDisplay   = $('coinDisplay');
+const hudCoinDisplay = $('hudCoinDisplay');
+const stateLabel    = $('stateLabel');
+const logBox        = $('logBox');
+const toastNoCoin   = $('toastNoCoin');
+
+const screenWelcome = $('screenWelcome');
+const screenScripts = $('screenScripts');
+const immersiveScreen = $('immersiveScreen');
+const systemModal   = $('systemModal');
+
+const waterLayer    = $('waterLayer');
+const edgeFlood     = $('edgeFlood');
+const narrativeBox  = $('narrativeBox');
+const typewriterText= $('typewriterText');
+
+// 沉浸态：主角 / 移动提示 / 水位
+const heroSprite    = $('heroSprite');
+const heroBody      = $('heroBody');
+const moveHint      = $('moveHint');
+const objective     = $('objective');
+const hudWater      = $('hudWater');
+const sceneGoalGlow = $('sceneGoalGlow');
+const rainA         = $('rainA');
+const bubblesB      = $('bubblesB');
+
+// 分支 / 结算相关
+const branchLayer       = $('branchLayer');
+const sceneA            = $('sceneA');
+const sceneB            = $('sceneB');
+const branchStageA      = sceneA.querySelector('.branch-stage');
+const branchStageB      = sceneB.querySelector('.branch-stage');
+const branchWater       = $('branchWater');
+const blackCurtain      = $('blackCurtain');
+const glitchOverlay     = $('glitchOverlay');
+const mosaicLayer       = $('mosaicLayer');
+const branchCaption     = $('branchCaption');
+const warningBox        = $('warningBox');
+const warningText       = $('warningText');
+
+// 过场互动（划桨 / 求生 QTE）
+const rowUI        = $('rowUI');
+const rowProgFill  = $('rowProgFill');
+const swimUI       = $('swimUI');
+const swimStamFill = $('swimStamFill');
+const swimDistFill = $('swimDistFill');
+const boatRow      = $('boatRow');
+const heroSwim     = $('heroSwim');
+const scarfFloat   = $('scarfFloat');
+const searchlight  = $('searchlight');
+const fishGroup    = $('fishGroup');
+const waveLayer    = $('waveLayer');
+const marineSnow   = $('marineSnow');
+let rowState  = null;   // 分支 A 划桨小游戏状态
+let swimState = null;   // 分支 B 求生小游戏状态
+let drownState = null;  // 分支 B 溺水下沉长镜头状态（期间可挣扎）
+
+const settlementBackdrop  = $('settlementBackdrop');
+const soulQuestion        = $('soulQuestion');
+const settlementTag       = $('settlementTag');
+const settlementBranch    = $('settlementBranch');
+const settlementCoin      = $('settlementCoin');
+const settlementNote      = $('settlementNote');
+const settlementItemLabel = $('settlementItemLabel');
+const settlementItem      = $('settlementItem');
+
+const badgeGrid      = $('badgeGrid');
+const itemList       = $('itemList');
+const itemEmptyHint  = $('itemEmptyHint');
+const emptyHint      = $('emptyHint');
+
+// ---------- 物品 / 徽章定义表 ----------
+const ITEM_DEFS = {
+  survivor_list: {
+    id: 'survivor_list',
+    type: 'item',
+    icon: '📜',
+    name: '泛黄的泰坦尼克号乘客幸存名单',
+    desc: '纸质 · 焦边 · 编号 R-217 · 1912'
+  },
+  halo: {
+    id: 'halo',
+    type: 'badge',
+    icon: '✧',
+    name: '人性的光辉',
+    desc: '传说级徽章 · 全服获得率 0.0001%'
+  }
+};
+
+// ---------- 工具函数 ----------
+function switchState(newState) {
+  game.state = newState;
+
+  // 清屏（所有覆盖层先复位）
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  immersiveScreen.classList.remove('active');
+  systemModal.classList.remove('active');
+  branchLayer.classList.remove('active', 'shake');
+  settlementBackdrop.classList.remove('active');
+  glitchOverlay.classList.remove('active');
+  mosaicLayer.innerHTML = '';
+  warningBox.classList.remove('active', 'shake-in');
+  blackCurtain.classList.remove('active');
+  branchWater.classList.remove('active');
+  branchStageA.classList.remove('sinking', 'drowning', 'rgb-split');
+  branchStageB.classList.remove('sinking', 'drowning', 'rgb-split', 'sinking-anim', 'depth-1', 'depth-2', 'depth-3', 'flail');
+  sceneB.querySelector('.cam-b').classList.remove('cam-dive');
+  sceneA.classList.remove('show');
+  sceneB.classList.remove('show');
+  branchCaption.classList.remove('beat');
+  branchCaption.innerHTML = '';
+  sceneGoalGlow.classList.remove('on');
+  rowUI.classList.remove('show');
+  swimUI.classList.remove('show');
+  rowState = null;
+  swimState = null;
+  drownState = null;
+  if (scarfFloat) scarfFloat.classList.remove('detach');
+  if (searchlight) searchlight.classList.remove('sweep');
+  if (fishGroup) fishGroup.classList.remove('swim');
+  if (waveLayer) waveLayer.innerHTML = '';
+  const _pk = $('plankton');
+  if (_pk) _pk.classList.remove('scatter');
+  document.querySelectorAll('#fallDebris > g.nudge').forEach(g => g.classList.remove('nudge'));
+  if (boatRow) boatRow.removeAttribute('transform');
+  if (heroSwim) heroSwim.removeAttribute('transform');
+
+  switch (newState) {
+    case STATES.WELCOME:
+      screenWelcome.classList.add('active');
+      stateLabel.textContent = '· 待机中 ·';
+      break;
+    case STATES.SCRIPTS:
+      screenScripts.classList.add('active');
+      stateLabel.textContent = '· 剧本兑换中 ·';
+      break;
+    case STATES.IMMERSIVE:
+      immersiveScreen.classList.add('active');
+      stateLabel.textContent = '· 沉浸舱运行中 ·';
+      break;
+    case STATES.SYSTEM_PROMPT:
+      // 保留沉浸画面，让走廊在提示框后方隐约可见
+      immersiveScreen.classList.add('active');
+      systemModal.classList.add('active');
+      stateLabel.textContent = '· 等待选择 ·';
+      break;
+    case STATES.BRANCH:
+      branchLayer.classList.add('active');
+      stateLabel.textContent = '· 历史推演中 ·';
+      break;
+    case STATES.WARNING:
+      branchLayer.classList.add('active');
+      stateLabel.textContent = '· 强制剥离中 ·';
+      break;
+    case STATES.SETTLEMENT:
+      settlementBackdrop.classList.add('active');
+      stateLabel.textContent = '· 已结算 ·';
+      break;
+  }
+}
+
+function updateCoinUI() {
+  coinDisplay.textContent = game.coins;
+  hudCoinDisplay.textContent = 'TC: ' + game.coins;
+  // 透支时用红色显示，强化「系统惩罚牺牲」的压迫感
+  const negative = game.coins < 0;
+  coinDisplay.style.color = negative ? 'var(--danger)' : '';
+  coinDisplay.style.textShadow = negative ? '0 0 12px rgba(239,83,80,0.65)' : '';
+}
+
+function addLog(msg, type='') {
+  const div = document.createElement('div');
+  div.className = 'log-entry ' + type;
+  div.textContent = msg;
+  logBox.appendChild(div);
+  logBox.scrollTop = logBox.scrollHeight;
+}
+
+// ---------- 典当按钮 ----------
+$('btnPawn').addEventListener('click', () => {
+  const gain = 10;
+  game.coins += gain;
+  updateCoinUI();
+  addLog(`典当通勤时间 +${gain} TC`, 'plus');
+
+  // 按钮抖动反馈
+  const btn = $('btnPawn');
+  btn.style.transform = 'translateY(1px)';
+  setTimeout(() => btn.style.transform = '', 120);
+});
+
+// ---------- 导航按钮 ----------
+$('btnOpenScripts').addEventListener('click', () => switchState(STATES.SCRIPTS));
+$('btnEnterScripts').addEventListener('click', () => switchState(STATES.SCRIPTS));
+
+// ---------- 剧本兑换按钮 ----------
+$('btnExchangeTitanic').addEventListener('click', () => {
+  const cost = 350;
+  if (game.coins < cost) {
+    toastNoCoin.classList.add('show');
+    setTimeout(() => toastNoCoin.classList.remove('show'), 3500);
+    addLog(`TC 不足，兑换失败（需 ${cost} TC）`);
+    return;
+  }
+  // 扣除
+  game.coins -= cost;
+  updateCoinUI();
+  addLog(`兑换剧本「泰坦尼克号 · 沉没之夜」 -${cost} TC`, 'plus');
+
+  // 进入沉浸态
+  enterImmersion();
+});
+
+// ---------- 沉浸体验启动 ----------
+function enterImmersion() {
+  switchState(STATES.IMMERSIVE);
+  resetImmersiveScene();   // 保证二次游玩时场景干净
+  addLog('记忆注入中：1912-04-15 02:10', 'plus');
+  renderHero();
+
+  // 时间线：黑暗 → 介绍文字（可同时自由移动） → 海水上涨 → 走到救生艇触发选择
+  setTimeout(() => {
+    narrativeBox.style.opacity = '1';
+    narrativeBox.classList.add('cursor-blink');
+    startTypewriter(
+      '1912年4月15日，深夜。船体剧烈倾斜，冰冷的海水疯狂涌入走廊。' +
+      '你发现一艘救生艇只剩下一个空位，但旁边一位母亲正抱着婴儿，绝望地看着你。',
+      () => {
+        narrativeBox.classList.remove('cursor-blink');
+        addLog('场景注入完成：向右走到走廊尽头的救生艇前。', 'plus');
+      }
+    );
+  }, 1500);
+
+  // 启动逐帧循环：主角移动 + 水位上涨
+  immersion.active = true;
+  immersion.autoWalk = false;
+  water.ratio = 0;
+  immersion.startAt = performance.now();
+  immersion.last = immersion.startAt;
+  immersion.idleAt = immersion.startAt;
+  immersion.rafId = requestAnimationFrame(immersionTick);
+}
+
+// ---------- 打字机效果 ----------
+function startTypewriter(text, onDone, target = typewriterText, speed = 60) {
+  let i = 0;
+  target.textContent = '';
+  const timer = setInterval(() => {
+    if (i >= text.length) {
+      clearInterval(timer);
+      if (onDone) onDone();
+      return;
+    }
+    target.textContent += text.charAt(i);
+    i++;
+  }, speed);
+}
+
+/* ============================================================
+   沉浸态 · 主角可控移动（WASD / 方向键 / 点击地面自动行走）
+   海水逐帧上涨并封锁退路，走到走廊尽头的救生艇触发历史冲突选择
+   ============================================================ */
+const HERO_SPAWN_X = 0.13;   // 出生点（画面宽度比例，0 = 左舷破口侧）
+const HERO_SPAWN_Y = 0.62;   // 0 = 走廊里侧，1 = 靠近镜头
+const HERO_GOAL_X  = 0.70;   // 抵达救生艇的触发线（横向）
+const HERO_GOAL_Y  = 0.40;   // 抵达救生艇的触发深度（须躲开靠镜头侧的积水）
+const HERO_SPEED   = 0.115;  // 每秒移动（画面比例）
+const WATER_MAX    = 0.62;   // 最终水位（占画面高度）
+const WATER_DELAY  = 1.8;    // 海水开始上涨的延迟（秒）
+const WATER_RISE   = 10.5;   // 涨到最终水位所需秒数
+const IDLE_AUTOWALK = 16;    // 长时间不操作，水势自动把主角推向出口
+
+const hero = {
+  x: HERO_SPAWN_X, y: HERO_SPAWN_Y,
+  targetX: null, targetY: null,
+  facing: 1, walking: false, arrived: false
+};
+const water = { ratio: 0 };
+const immersion = { active: false, rafId: 0, startAt: 0, last: 0, idleAt: 0, autoWalk: false };
+const keys = new Set();
+
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+const shipWrapper = document.querySelector('.ship-wrapper');
+
+// 键盘：WASD / 方向键 直接移动
+document.addEventListener('keydown', (e) => {
+  if (game.state !== STATES.IMMERSIVE) return;
+  const k = e.key.toLowerCase();
+  if (k === 'w' || k === 'a' || k === 's' || k === 'd' ||
+      k === 'arrowup' || k === 'arrowdown' || k === 'arrowleft' || k === 'arrowright') {
+    keys.add(k);
+    e.preventDefault();
+  }
+});
+document.addEventListener('keyup', (e) => { keys.delete(e.key.toLowerCase()); });
+
+// ESC 退出沉浸舱
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && game.state === STATES.IMMERSIVE) exitImmersion();
+});
+
+// 点击地面：自动寻路到落点（换算成 x 横向比例 / y 纵深比例）
+immersiveScreen.addEventListener('pointerdown', (e) => {
+  if (game.state !== STATES.IMMERSIVE || hero.arrived) return;
+  // 点在 HUD / 提示 / 字幕上时不算移动指令
+  if (e.target.closest('.hud-top, .narrative-box, .move-hint, .objective')) return;
+  const r = immersiveScreen.getBoundingClientRect();
+  const px = clamp((e.clientX - r.left) / r.width, 0, 1);
+  const py = clamp((e.clientY - r.top) / r.height, 0, 1);
+  hero.targetX = clamp(px, 0.03, 0.97);
+  hero.targetY = clamp((py * 100 - 74) / 20, 0.05, 1);
+  immersion.idleAt = performance.now();
+});
+
+// 逐帧：水位上涨 → 读取输入 → 海水封锁 → 渲染 → 抵达判定
+function immersionTick(now) {
+  if (!immersion.active) return;
+  const dt = Math.min(0.05, (now - immersion.last) / 1000);
+  immersion.last = now;
+  const elapsed = (now - immersion.startAt) / 1000;
+
+  // 水位：延迟 1.8s 后开始，约 11s 涨到最终高度
+  water.ratio = Math.min(WATER_MAX, Math.max(0, elapsed - WATER_DELAY) * (WATER_MAX / WATER_RISE));
+
+  // 方向输入（键盘优先，其次自动寻路）
+  let dx = 0, dy = 0;
+  if (keys.has('a') || keys.has('arrowleft'))  dx -= 1;
+  if (keys.has('d') || keys.has('arrowright')) dx += 1;
+  if (keys.has('w') || keys.has('arrowup'))    dy -= 1;
+  if (keys.has('s') || keys.has('arrowdown'))  dy += 1;
+
+  if (dx || dy) {
+    hero.targetX = null; hero.targetY = null;
+    immersion.idleAt = now;
+  } else if (hero.targetX !== null) {
+    const ex = hero.targetX - hero.x, ey = hero.targetY - hero.y;
+    if (Math.abs(ex) < 0.012 && Math.abs(ey) < 0.012) {
+      hero.targetX = null; hero.targetY = null;
+    } else {
+      dx = Math.sign(ex); dy = Math.sign(ey);
+      immersion.idleAt = now;
+    }
+  }
+
+  const moving = !!(dx || dy);
+  if (moving) {
+    const len = Math.hypot(dx, dy) || 1;
+    if (dx) hero.facing = dx < 0 ? -1 : 1;
+    hero.x += (dx / len) * HERO_SPEED * dt;
+    hero.y += (dy / len) * HERO_SPEED * dt;
+  }
+  hero.walking = moving;
+  heroBody.classList.toggle('bob', moving);
+
+  // 海水封锁：左舷破口向左封路，靠镜头一侧向里封路 —— 水把人推向出口
+  const minX = 0.05 + water.ratio * 0.46;
+  const maxY = 1 - water.ratio * 0.78;
+  const prevX = hero.x, prevY = hero.y;
+  hero.x = clamp(hero.x, minX, 0.94);
+  hero.y = clamp(hero.y, 0.05, Math.max(0.05, maxY));
+  const blocked = hero.x !== prevX || hero.y !== prevY;
+  if (blocked) hero.targetX = null;          // 寻路路径被水切断，停下等玩家重新决定
+  moveHint.classList.toggle('urgent', blocked || immersion.autoWalk);
+
+  // 长时间不操作：水势自动把主角推向出口，避免卡死
+  if (!immersion.autoWalk && !hero.arrived && elapsed > IDLE_AUTOWALK) {
+    immersion.autoWalk = true;
+    hero.targetX = HERO_GOAL_X; hero.targetY = HERO_GOAL_Y;
+    moveHint.classList.add('urgent');
+    addLog('水位已封住退路，系统接管：朝救生艇移动。', 'plus');
+  }
+
+  renderHero();
+
+  if (!hero.arrived && hero.x >= HERO_GOAL_X && hero.y <= HERO_GOAL_Y) {
+    arriveAtLifeboat();
+    return;
+  }
+
+  immersion.rafId = requestAnimationFrame(immersionTick);
+}
+
+// 主角渲染：位置 / 远近缩放 / 朝向 / 被海水淹没的下半身
+function renderHero() {
+  const bottom = 26 - hero.y * 20;                 // y=0 → 26%（远）… y=1 → 6%（近）
+  const scale  = 1.06 - hero.x * 0.30;             // 越靠走廊尽头越小，形成纵深
+  heroSprite.style.left   = (hero.x * 100).toFixed(2) + '%';
+  heroSprite.style.bottom = bottom.toFixed(2) + '%';
+  heroSprite.style.transform = 'scale(' + scale.toFixed(3) + ') scaleX(' + hero.facing + ')';
+
+  // 水位高于脚踝时，裁掉水下部分，制造「正在被淹没」的观感
+  const H = shipWrapper.clientHeight || window.innerHeight;
+  const spriteH = heroSprite.offsetHeight || 143;
+  const feetFromBottom  = (bottom / 100) * H;
+  const waterFromBottom = water.ratio * H;
+  const submerged = clamp(waterFromBottom - feetFromBottom, 0, spriteH * scale) / scale;
+  heroSprite.style.clipPath = submerged > 0.5 ? 'inset(0 0 ' + submerged.toFixed(1) + 'px 0)' : 'none';
+
+  // 水位 / 边缘海水 HUD
+  waterLayer.style.height = (water.ratio * 100).toFixed(1) + '%';
+  edgeFlood.style.opacity = Math.min(0.88, water.ratio * 1.5).toFixed(2);
+  hudWater.textContent = '水位 ' + Math.round(water.ratio * 100) + '%';
+}
+
+// 抵达救生艇：点亮暖光 → 停留两秒 → 弹出历史冲突节点
+function arriveAtLifeboat() {
+  hero.arrived = true;
+  hero.targetX = null; hero.targetY = null;
+  hero.walking = false;
+  hero.facing = 1;
+  heroBody.classList.remove('bob');
+  renderHero();
+
+  immersion.active = false;
+  cancelAnimationFrame(immersion.rafId);
+
+  sceneGoalGlow.classList.add('on');
+  objective.classList.add('arrived');
+  objective.innerHTML = '<span class="obj-arrow">✓</span> 已抵达救生艇';
+  moveHint.classList.remove('urgent');
+  moveHint.innerHTML = '<span class="txt">…你与抱着婴儿的母亲对视</span>';
+
+  playBellChime();
+  narrativeBox.style.opacity = '0';
+  narrativeBox.classList.remove('cursor-blink');
+  addLog('抵达舷侧拱门：救生艇只剩一个空位。', 'plus');
+
+  setTimeout(() => { switchState(STATES.SYSTEM_PROMPT); }, 2200);
+}
+
+// 复位沉浸舱场景（ESC 退出 / 返回主界面 都会调用，保证二次游玩干净）
+function resetImmersiveScene() {
+  immersion.active = false;
+  cancelAnimationFrame(immersion.rafId);
+  immersion.autoWalk = false;
+  keys.clear();
+
+  water.ratio = 0;
+  waterLayer.style.height = '0%';
+  edgeFlood.style.opacity = '0';
+  hudWater.textContent = '水位 0%';
+
+  hero.x = HERO_SPAWN_X; hero.y = HERO_SPAWN_Y;
+  hero.targetX = null; hero.targetY = null;
+  hero.facing = 1; hero.walking = false; hero.arrived = false;
+  heroSprite.style.clipPath = 'none';
+  heroSprite.style.transform = '';
+  heroSprite.style.left = (HERO_SPAWN_X * 100) + '%';
+  heroSprite.style.bottom = '22%';
+  heroBody.classList.remove('bob');
+
+  narrativeBox.style.opacity = '0';
+  narrativeBox.classList.remove('cursor-blink');
+  typewriterText.textContent = '';
+
+  moveHint.classList.remove('urgent');
+  moveHint.innerHTML =
+    '<span class="k">W</span><span class="k">A</span><span class="k">S</span><span class="k">D</span>' +
+    '<span class="txt">移动 · 或点击地面</span>';
+  objective.classList.remove('arrived');
+  objective.innerHTML = '<span class="obj-arrow">▶</span> 目标：走廊尽头的救生艇（向右 · 向里）';
+  sceneGoalGlow.classList.remove('on');
+}
+
+function exitImmersion() {
+  resetImmersiveScene();
+  switchState(STATES.SCRIPTS);
+  addLog('你已退出记忆注入舱。');
+}
+
+
+/* ============================================================
+   音频引擎（Web Audio API 合成，无外部音频文件）
+   ============================================================ */
+let audioCtx = null;
+function getAudioCtx() {
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return null;
+  if (!audioCtx) audioCtx = new AC();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+
+function noiseBuffer(ctx, seconds) {
+  const buf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * seconds), ctx.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+  return buf;
+}
+
+// 海水吞没的沉重轰鸣（低频噪声 + 下沉正弦扫频）
+function playWaterRumble(duration = 3.4) {
+  try {
+    const ctx = getAudioCtx();
+    if (!ctx) return;
+    const t = ctx.currentTime;
+
+    const src = ctx.createBufferSource();
+    src.buffer = noiseBuffer(ctx, duration);
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.setValueAtTime(150, t);
+    lp.frequency.linearRampToValueAtTime(620, t + duration);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.32, t + 0.18);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + duration);
+    src.connect(lp).connect(g).connect(ctx.destination);
+    src.start(t); src.stop(t + duration);
+
+    const osc = ctx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(88, t);
+    osc.frequency.exponentialRampToValueAtTime(32, t + duration);
+    const og = ctx.createGain();
+    og.gain.setValueAtTime(0.0001, t);
+    og.gain.exponentialRampToValueAtTime(0.24, t + 0.22);
+    og.gain.exponentialRampToValueAtTime(0.0001, t + duration);
+    osc.connect(og).connect(ctx.destination);
+    osc.start(t); osc.stop(t + duration);
+  } catch (err) { console.warn('audio unavailable:', err); }
+}
+
+// 强烈电流声（锯齿波跳频 + 高频噪声噼啪）
+function playElectricZap(duration = 0.95) {
+  try {
+    const ctx = getAudioCtx();
+    if (!ctx) return;
+    const t = ctx.currentTime;
+
+    const osc = ctx.createOscillator();
+    osc.type = 'sawtooth';
+    const steps = 16;
+    for (let i = 0; i < steps; i++) {
+      osc.frequency.setValueAtTime(260 + Math.random() * 3200, t + (i * duration) / steps);
+    }
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass'; bp.frequency.value = 2100; bp.Q.value = 1.1;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.26, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + duration);
+    osc.connect(bp).connect(g).connect(ctx.destination);
+    osc.start(t); osc.stop(t + duration);
+
+    const src = ctx.createBufferSource();
+    src.buffer = noiseBuffer(ctx, duration);
+    const hp = ctx.createBiquadFilter();
+    hp.type = 'highpass'; hp.frequency.value = 1400;
+    const ng = ctx.createGain();
+    ng.gain.setValueAtTime(0.16, t);
+    ng.gain.exponentialRampToValueAtTime(0.0001, t + duration);
+    src.connect(hp).connect(ng).connect(ctx.destination);
+    src.start(t); src.stop(t + duration);
+  } catch (err) { console.warn('audio unavailable:', err); }
+}
+
+// 溺水：闷响 + 逐渐被封住的高频（模拟没入水下）
+function playDrown(duration = 3.2) {
+  try {
+    const ctx = getAudioCtx();
+    if (!ctx) return;
+    const t = ctx.currentTime;
+
+    const src = ctx.createBufferSource();
+    src.buffer = noiseBuffer(ctx, duration);
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.setValueAtTime(5200, t);
+    lp.frequency.exponentialRampToValueAtTime(140, t + duration);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.28, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + duration);
+    src.connect(lp).connect(g).connect(ctx.destination);
+    src.start(t); src.stop(t + duration);
+
+    const osc = ctx.createOscillator();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(160, t);
+    osc.frequency.exponentialRampToValueAtTime(28, t + duration);
+    const og = ctx.createGain();
+    og.gain.setValueAtTime(0.14, t);
+    og.gain.exponentialRampToValueAtTime(0.0001, t + duration);
+    osc.connect(og).connect(ctx.destination);
+    osc.start(t); osc.stop(t + duration);
+  } catch (err) { console.warn('audio unavailable:', err); }
+}
+
+
+// 船笛 / 汽笛：低沉悠长（锯齿 + 三角双音，缓慢包络）
+function playWhistle(duration = 1.8) {
+  try {
+    const ctx = getAudioCtx();
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    [138, 208].forEach((f, i) => {
+      const osc = ctx.createOscillator();
+      osc.type = i ? 'triangle' : 'sawtooth';
+      osc.frequency.setValueAtTime(f, t);
+      osc.frequency.linearRampToValueAtTime(f * 0.93, t + duration);
+      const lp = ctx.createBiquadFilter();
+      lp.type = 'lowpass'; lp.frequency.value = 880;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(i ? 0.10 : 0.16, t + 0.36);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + duration);
+      osc.connect(lp).connect(g).connect(ctx.destination);
+      osc.start(t); osc.stop(t + duration);
+    });
+  } catch (err) { console.warn('audio unavailable:', err); }
+}
+
+// 雨幕：高通白噪声，铺满整个甲板过场
+function playRainHiss(duration = 4.6) {
+  try {
+    const ctx = getAudioCtx();
+    if (!ctx) return;
+    const t = ctx.currentTime;
+
+    const src = ctx.createBufferSource();
+    src.buffer = noiseBuffer(ctx, duration);
+    const hp = ctx.createBiquadFilter();
+    hp.type = 'highpass'; hp.frequency.value = 950;
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass'; lp.frequency.value = 7200;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.11, t + 0.7);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + duration);
+    src.connect(hp).connect(lp).connect(g).connect(ctx.destination);
+    src.start(t); src.stop(t + duration);
+  } catch (err) { console.warn('audio unavailable:', err); }
+}
+
+// 抵达救生艇：一声清冷的钟鸣（三阶泛音，长衰减）
+function playBellChime() {
+  try {
+    const ctx = getAudioCtx();
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    [523.25, 784.0, 1046.5].forEach((f, i) => {
+      const osc = ctx.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.value = f;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.16 / (i + 1), t + 0.012);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 2.6);
+      osc.connect(g).connect(ctx.destination);
+      osc.start(t); osc.stop(t + 2.6);
+    });
+  } catch (err) { console.warn('audio unavailable:', err); }
+}
+
+// 划水 / 拍水：短促的低通噪声水花
+function playSplash() {
+  try {
+    const ctx = getAudioCtx();
+    if (!ctx) return;
+    const t = ctx.currentTime;
+
+    const src = ctx.createBufferSource();
+    src.buffer = noiseBuffer(ctx, 0.3);
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.setValueAtTime(1600, t);
+    lp.frequency.exponentialRampToValueAtTime(360, t + 0.3);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.16, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.3);
+    src.connect(lp).connect(g).connect(ctx.destination);
+    src.start(t); src.stop(t + 0.3);
+  } catch (err) { console.warn('audio unavailable:', err); }
+}
+
+
+/* ============================================================
+   物品 / 徽章发放
+   ============================================================ */
+function grantItem(itemId) {
+  const item = ITEM_DEFS[itemId];
+  if (!item) return null;
+  if (game.granted.includes(itemId)) return item;   // 重复发放保护
+  game.granted.push(itemId);
+
+  if (item.type === 'badge') {
+    const slot = badgeGrid.querySelector('.badge-slot:not(.unlocked)');
+    if (slot) {
+      slot.classList.add('unlocked', 'rare');
+      slot.innerHTML =
+        `<span class="badge-icon">${item.icon}</span>` +
+        `<span class="badge-name">${item.name}</span>`;
+      slot.title = item.desc;
+    }
+    addLog(`获得稀有徽章：${item.name}`, 'plus');
+  } else {
+    const row = document.createElement('div');
+    row.className = 'inv-item';
+    row.innerHTML =
+      `<span class="inv-icon">${item.icon}</span>` +
+      `<div><div class="inv-name">${item.name}</div>` +
+      `<div class="inv-desc">${item.desc}</div></div>`;
+    itemList.appendChild(row);
+    addLog(`获得物品：${item.name}`, 'plus');
+  }
+
+  refreshInventoryHints();
+  return item;
+}
+
+function refreshInventoryHints() {
+  const hasItems = itemList.children.length > 0;
+  itemEmptyHint.style.display = hasItems ? 'none' : 'block';
+
+  const unlockedBadges = badgeGrid.querySelectorAll('.badge-slot.unlocked').length;
+  if (unlockedBadges > 0) {
+    emptyHint.innerHTML =
+      `· 已解锁 ${unlockedBadges} 枚徽章 ·<br/>` +
+      `每一枚都记录着一次<br/>你无法撤回的选择。<br/><br/>` +
+      `<span style="color:var(--lamp-deep);">— 生命不会重来 —</span><br/>` +
+      `<span style="color:var(--lamp-deep);">— 但可以活多次 —</span>`;
+  }
+}
+
+
+/* ============================================================
+   过场小道具生成器（雨幕 / 气泡 / 撕裂带 / 字幕节拍）
+   ============================================================ */
+// 分支字幕：换行后强制重放淡入节拍
+function setCaption(html) {
+  branchCaption.innerHTML = html;
+  branchCaption.classList.remove('beat');
+  void branchCaption.offsetWidth;   // 强制重排，让动画重新开始
+  branchCaption.classList.add('beat');
+}
+
+// 雨幕
+function buildRain(container, count) {
+  if (!container) return;
+  container.innerHTML = '';
+  for (let i = 0; i < count; i++) {
+    const d = document.createElement('div');
+    d.className = 'drop';
+    d.style.left = (Math.random() * 112 - 6).toFixed(2) + '%';
+    d.style.height = (34 + Math.random() * 42).toFixed(0) + 'px';
+    d.style.animationDuration = (0.55 + Math.random() * 0.65).toFixed(2) + 's';
+    d.style.animationDelay = (-Math.random() * 1.6).toFixed(2) + 's';
+    d.style.opacity = (0.35 + Math.random() * 0.5).toFixed(2);
+    container.appendChild(d);
+  }
+}
+
+// 上浮的气泡
+function buildBubbles(container, count) {
+  if (!container) return;
+  container.innerHTML = '';
+  for (let i = 0; i < count; i++) {
+    const b = document.createElement('div');
+    b.className = 'bubble';
+    const size = 5 + Math.random() * 17;
+    b.style.left = (Math.random() * 100).toFixed(2) + '%';
+    b.style.width = size.toFixed(1) + 'px';
+    b.style.height = size.toFixed(1) + 'px';
+    b.style.animationDuration = (2.4 + Math.random() * 3.6).toFixed(2) + 's';
+    b.style.animationDelay = (-Math.random() * 3).toFixed(2) + 's';
+    container.appendChild(b);
+  }
+}
+
+// 横向撕裂带（叠加在花屏之上）
+function buildRips(count) {
+  for (let i = 0; i < count; i++) {
+    const rip = document.createElement('div');
+    rip.className = 'rip';
+    rip.style.top = (Math.random() * 100).toFixed(2) + '%';
+    rip.style.height = (2 + Math.random() * 10).toFixed(0) + 'px';
+    rip.style.opacity = (0.35 + Math.random() * 0.5).toFixed(2);
+    rip.style.animationDelay = (Math.random() * 0.2).toFixed(2) + 's';
+    mosaicLayer.appendChild(rip);
+  }
+}
+
+
+/* ============================================================
+   花屏 / 马赛克撕裂 生成器
+   ============================================================ */
+function buildMosaic() {
+  mosaicLayer.innerHTML = '';
+  const palette = ['#66D9E8', '#C1554A', '#E8B75A', '#F4F0E4', '#2B2A26', '#7E93A4'];
+  for (let i = 0; i < 90; i++) {
+    const b = document.createElement('div');
+    b.className = 'mosaic-block';
+    b.style.left = (Math.random() * 100).toFixed(2) + '%';
+    b.style.top = (Math.random() * 100).toFixed(2) + '%';
+    b.style.width = (10 + Math.random() * 68).toFixed(0) + 'px';
+    b.style.height = (6 + Math.random() * 26).toFixed(0) + 'px';
+    b.style.background = palette[(Math.random() * palette.length) | 0];
+    b.style.opacity = (0.25 + Math.random() * 0.6).toFixed(2);
+    b.style.animationDelay = (Math.random() * 0.12).toFixed(3) + 's';
+    mosaicLayer.appendChild(b);
+  }
+  // 几条横向撕裂线
+  for (let i = 0; i < 5; i++) {
+    const tear = document.createElement('div');
+    tear.className = 'tear';
+    tear.style.top = (Math.random() * 100).toFixed(2) + '%';
+    tear.style.opacity = (0.4 + Math.random() * 0.5).toFixed(2);
+    mosaicLayer.appendChild(tear);
+  }
+}
+
+
+/* ============================================================
+   分支 A：坐上救生艇（冷漠 / 自保）
+   落座 → 交互式划桨（A/D 交替或点击）→ 三拍字幕 → 黑场
+   结算：+300 TC，获得「泛黄的泰坦尼克号乘客幸存名单」
+   ============================================================ */
+function chooseBranchA() {
+  addLog('你选择：A. 坐上救生艇（冷漠/自保）', 'plus');
+
+  switchState(STATES.BRANCH);
+  sceneA.classList.add('show');
+  sceneB.classList.remove('show');
+
+  // 环境铺陈：雨幕 + 汽笛 + 浪涌轰鸣（推镜由 #sceneA.show .cam-a 自动播放）
+  buildRain(rainA, 48);
+  playWhistle(2.2);
+  playWaterRumble(4.6);
+  setTimeout(() => playRainHiss(8), 380);
+
+  // 第一拍：落座
+  setCaption('你跨过船舷，在那个空位上坐下了。<br/>怀里还残留着走廊深处的寒气。');
+
+  // 2 秒后进入划桨互动：A/D 交替或连点画面
+  rowState = { prog: 0, last: 'd', done: false };
+  setTimeout(() => {
+    if (!rowState || rowState.done) return;
+    rowUI.classList.add('show');
+    rowProgFill.style.width = '0%';
+  }, 2100);
+
+  // 15 秒兜底：不划的话船随波漂流，照样进入下一拍
+  setTimeout(() => { if (rowState && !rowState.done) finishRowing(true); }, 16000);
+}
+
+// 一次划桨（side 为另一侧桨）
+function rowStroke(side) {
+  if (!rowState || rowState.done) return;
+  if (side === rowState.last) return;            // 必须左右交替才有力
+  rowState.last = side;
+  rowState.prog = Math.min(100, rowState.prog + 7);
+
+  // 艇身随划桨缓缓离岸
+  const p = rowState.prog;
+  boatRow.setAttribute('transform',
+    `translate(${(p * 1.7).toFixed(1)} ${(-p * 0.14).toFixed(1)}) rotate(${(-p * 0.035).toFixed(2)} 770 430)`);
+  rowProgFill.style.width = p + '%';
+
+  // 水花 + 划水声
+  const flash = document.createElement('div');
+  flash.className = 'row-flash';
+  flash.style.left = (30 + Math.random() * 26) + '%';
+  flash.style.top  = (52 + Math.random() * 12) + '%';
+  sceneA.querySelector('.branch-stage').appendChild(flash);
+  setTimeout(() => flash.remove(), 820);
+  playSplash();
+
+  if (rowState.prog >= 100) finishRowing(false);
+}
+
+function finishRowing(auto) {
+  if (!rowState || rowState.done) return;
+  rowState.done = true;
+  rowUI.classList.remove('show');
+  if (auto) {
+    addLog('你握不住桨，救生艇随波逐流。');
+    boatRow.setAttribute('transform', 'translate(160 -13) rotate(-3.5 770 430)');
+  } else {
+    addLog('你一下一下划着桨，驶离了沉船。', 'plus');
+  }
+
+  // 第二拍 / 第三拍：字幕收束 → 黑场 → 结算（身后海水渐渐上涨）
+  branchWater.classList.add('active');
+  setTimeout(() => {
+    setCaption('船桨划开冰冷的水面，一寸寸远离那片沉船。<br/>母亲的手，在你身后一寸寸松开。');
+    playWhistle(1.2);
+  }, 1400);
+  setTimeout(() => {
+    setCaption('海面合拢，世界只剩下桨声。' +
+      '<span class="sfx">[ 音效：海水吞没 · 低频轰鸣 · 88Hz → 32Hz ]</span>');
+  }, 3600);
+  setTimeout(() => { blackCurtain.classList.add('active'); }, 5200);
+  setTimeout(() => { showSettlement('A'); }, 6600);
+}
+
+
+/* ============================================================
+   分支 B：让座（英雄 / 牺牲）
+   四拍：RGB 撕裂 → 撕裂带加剧 → 求生游动 QTE（必败）→ 溺水 → 警告
+   结算：-500 TC，获得「人性的光辉」
+   ============================================================ */
+function chooseBranchB() {
+  addLog('你选择：B. 让座（英雄/牺牲）', 'plus');
+
+  switchState(STATES.BRANCH);
+  sceneB.classList.add('show');
+  sceneA.classList.remove('show');
+
+  // 第一拍：花屏 / RGB 撕裂 + 强烈电流声
+  setCaption('第一拍 · 你站起身，把位置让了出去。');
+  buildMosaic();
+  glitchOverlay.classList.add('active');
+  branchLayer.classList.add('shake');
+  branchStageB.classList.add('rgb-split');
+  playElectricZap(0.95);
+  addLog('⚠ 历史秩序扰动：超出阈值', 'plus');
+
+  // 第二拍：撕裂加剧 —— 横向撕裂带 + 二次刷屏
+  setTimeout(() => {
+    buildRips(7);
+    branchStageB.classList.remove('rgb-split');
+    playElectricZap(1.4);
+    setCaption('第二拍 · 现实被撕开一道口子。<br/>你的轮廓正在从历史里被剪掉。');
+  }, 1250);
+
+  // 第三拍：坠海 → 求生游动互动（提示你游向木板，但结局早已注定）
+  setTimeout(() => {
+    glitchOverlay.classList.remove('active');
+    branchLayer.classList.remove('shake');
+    setCaption('冰冷的海水把你抛进黑暗。<br/>远处有一块漂浮的木板——求生本能被激活了。');
+    playDrown(7);
+    playSplash();
+    setTimeout(startSwimQTE, 1500);
+  }, 2650);
+}
+
+// 求生 QTE：连按空格/点击 → 游向木板；体力耗尽必然失败
+function startSwimQTE() {
+  swimState = { prog: 0, stam: 100, done: false, last: performance.now() };
+  swimUI.classList.add('show');
+  swimStamFill.style.width = '100%';
+  swimDistFill.style.width = '0%';
+
+  const tick = (now) => {
+    if (!swimState || swimState.done) return;
+    const dt = Math.min(0.05, (now - swimState.last) / 1000);
+    swimState.last = now;
+
+    swimState.stam -= 9.5 * dt;                       // 体力持续流失
+    swimStamFill.style.width = Math.max(0, swimState.stam) + '%';
+
+    // 游动进度：人缓缓向木板漂近
+    heroSwim.setAttribute('transform',
+      `translate(${(swimState.prog * 2.1).toFixed(1)} ${(-swimState.prog * 0.85).toFixed(1)})`);
+
+    if (swimState.stam <= 0) { finishSwim(false); return; }
+    if (swimState.prog >= 100) { finishSwim(true); return; }
+    requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
+
+function swimMash() {
+  if (!swimState || swimState.done) return;
+  swimState.prog = Math.min(100, swimState.prog + 4);    // 游近木板
+  swimState.stam = Math.max(0, swimState.stam - 2);      // 但每次划水都消耗体力
+  swimDistFill.style.width = swimState.prog + '%';
+  playSplash();
+}
+
+function finishSwim(reached) {
+  if (!swimState || swimState.done) return;
+  swimState.done = true;
+  swimUI.classList.remove('show');
+  playWhistle(0.9);
+
+  // 第四拍：无论抓没抓到木板，海水终将吞没一切
+  setTimeout(() => {
+    setCaption(reached
+      ? '你终于抓住了那块木板……<br/>但木板早已被海水浸透，正在缓缓下沉。'
+      : '四肢已经不再听使唤。<br/>远处的木板，停在再也够不到的地方。');
+    if (reached) addLog('你抓住了木板，但它救不了你。');
+  }, 400);
+
+  // 第五拍：沉没开始 —— 身体翻转成头朝下 + 摆臂抽动 + 尾流气泡 + 镜头拉远
+  setTimeout(() => {
+    branchStageB.classList.add('drowning', 'sinking-anim');
+    sceneB.querySelector('.cam-b').classList.add('cam-dive');
+    buildBubbles(bubblesB, 46);
+    drownState = { done: false };
+    setCaption('海水漫过你的胸口、脖颈、头顶。<br/><span class="sfx">求生本能仍在尖叫——按 空格 挣扎，或点击画面。</span>');
+    playDrown(4.5);
+  }, 2800);
+
+  // 第六拍：深度一 —— 光柱远去，沉船向上退走，浮木逆着你的下沉向上漂，围巾脱落
+  setTimeout(() => {
+    branchStageB.classList.add('depth-1');
+    if (scarfFloat) scarfFloat.classList.add('detach');
+    playWaterRumble(3.2);
+    setCaption('头顶的光柱越来越远，<br/>像一扇正在缓缓关闭的门。');
+  }, 6400);
+
+  // 第七拍：深度二 —— 背心最后的暖光熄灭，暗幕压下，探照灯扫过又错过，鱼群漠然路过
+  setTimeout(() => {
+    branchStageB.classList.add('depth-2');
+    if (searchlight) searchlight.classList.add('sweep');
+    if (fishGroup) fishGroup.classList.add('swim');
+    setCaption('一束搜救的光从头顶扫过——<br/>没有停留，照向别处去了。');
+  }, 9800);
+
+  // 第八拍：深度三 —— 近黑，身体不再属于自己
+  setTimeout(() => {
+    branchStageB.classList.add('depth-3');
+    setCaption('……很冷。<br/>但好像，不再疼了。');
+  }, 13000);
+
+  setTimeout(() => { drownState = null; showStrippingWarning(); }, 15500);
+}
+
+// 溺水下沉期间的挣扎：摆臂 + 气泡迸发 + 画面轻震（注定无用，但让玩家做完最后这件事）
+function drownStruggle() {
+  if (!drownState || drownState.done) return;
+  branchStageB.classList.remove('flail');
+  void branchStageB.offsetWidth;              // 强制回流，重新触发摆臂动画
+  branchStageB.classList.add('flail');
+  buildBubbles(bubblesB, 10);
+  playSplash();
+  branchLayer.classList.add('shake');
+  setTimeout(() => branchLayer.classList.remove('shake'), 350);
+}
+
+// 点击在水中荡开一圈压力涟漪
+function spawnWave(clientX, clientY) {
+  const svg = sceneB.querySelector('svg');
+  if (!svg || !waveLayer) return;
+  const r = svg.getBoundingClientRect();
+  const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+  c.setAttribute('cx', ((clientX - r.left) / r.width * 1200).toFixed(1));
+  c.setAttribute('cy', ((clientY - r.top) / r.height * 675).toFixed(1));
+  c.setAttribute('r', 96);
+  c.addEventListener('animationend', () => c.remove());
+  waveLayer.appendChild(c);
+}
+
+// 海洋雪：随机分布、各自节奏的下沉微粒
+function buildMarineSnow(count = 26) {
+  if (!marineSnow) return;
+  marineSnow.innerHTML = '';
+  for (let i = 0; i < count; i++) {
+    const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    c.setAttribute('cx', (Math.random() * 1200).toFixed(0));
+    c.setAttribute('cy', (Math.random() * 675).toFixed(0));
+    c.setAttribute('r', (0.8 + Math.random() * 1.4).toFixed(1));
+    c.style.setProperty('--o', (0.18 + Math.random() * 0.3).toFixed(2));
+    c.style.animationDuration = (9 + Math.random() * 9).toFixed(2) + 's';
+    c.style.animationDelay = (-Math.random() * 12).toFixed(2) + 's';
+    marineSnow.appendChild(c);
+  }
+}
+buildMarineSnow();
+
+// 分支过场期间的输入：A/D 划桨 · 空格/点击 游泳
+document.addEventListener('keydown', (e) => {
+  if (game.state !== STATES.BRANCH) return;
+  const k = e.key.toLowerCase();
+  if (rowState && !rowState.done && sceneA.classList.contains('show')) {
+    if (k === 'a') { rowStroke('a'); e.preventDefault(); }
+    if (k === 'd') { rowStroke('d'); e.preventDefault(); }
+  }
+  if (swimState && !swimState.done && sceneB.classList.contains('show') && e.key === ' ') {
+    swimMash();
+    e.preventDefault();
+  }
+  if (drownState && !drownState.done && sceneB.classList.contains('show') && e.key === ' ') {
+    drownStruggle();
+    e.preventDefault();
+  }
+});
+branchLayer.addEventListener('pointerdown', (e) => {
+  if (game.state !== STATES.BRANCH) return;
+  if (rowState && !rowState.done && sceneA.classList.contains('show')) {
+    rowStroke(rowState.last === 'a' ? 'd' : 'a');
+  } else if (swimState && !swimState.done && sceneB.classList.contains('show')) {
+    swimMash();
+  } else if (drownState && !drownState.done && sceneB.classList.contains('show')) {
+    drownStruggle();
+    spawnWave(e.clientX, e.clientY);
+    // 环境互动：点到浮木 → 打个转；点到浮游微光 → 惊散又聚拢
+    const plank = e.target.closest && e.target.closest('#fallDebris > g');
+    if (plank) {
+      plank.classList.remove('nudge');
+      void plank.getBoundingClientRect();
+      plank.classList.add('nudge');
+    }
+    if (e.target.closest && e.target.closest('#plankton')) {
+      const p = $('plankton');
+      p.classList.remove('scatter');
+      void p.offsetWidth;
+      p.classList.add('scatter');
+    }
+  }
+});
+
+// 强制剥离警告：不整屏清洗，让警告压在溺水画面上方
+function showStrippingWarning() {
+  game.state = STATES.WARNING;
+  stateLabel.textContent = '· 强制剥离中 ·';
+  branchLayer.classList.add('active');
+  sceneB.classList.add('show');
+  addLog('强制剥离神经链接程序已启动。', 'plus');
+
+  warningBox.classList.remove('active', 'shake-in');
+  void warningBox.offsetWidth;                // 强制重排，重放「震入」动画
+  warningBox.classList.add('active', 'shake-in');
+  warningText.classList.remove('done');
+  warningText.textContent = '';
+  startTypewriter(
+    '警告：您严重打乱了历史秩序，正在强制剥离神经链接...',
+    () => {
+      warningText.classList.add('done');
+      setTimeout(() => { showSettlement('B'); }, 1600);
+    },
+    warningText,
+    45
+  );
+}
+
+
+/* ============================================================
+   结算：更新时间币 + 发放物品
+   ============================================================ */
+function showSettlement(branch) {
+  switchState(STATES.SETTLEMENT);
+
+  if (branch === 'A') {
+    // ---- 分支 A：系统返还 300 TC，奖励冷漠 ----
+    game.coins += 300;
+    updateCoinUI();
+
+    settlementTag.textContent = '▸ SETTLEMENT · A';
+    settlementBranch.textContent = '分支 A · 冷漠 / 自保';
+    settlementCoin.textContent = '+300';
+    settlementCoin.classList.remove('negative');
+    settlementNote.textContent =
+      '系统注记：行为与历史权重一致，判定为「低扰动」。' +
+      '返还差额补贴已发放。（当前余额 ' + game.coins + ' TC）';
+
+    soulQuestion.textContent = '';
+    soulQuestion.classList.remove('active');
+
+    settlementItemLabel.textContent = '获得物品';
+    const item = grantItem('survivor_list');
+    renderSettlementItem(item);
+
+    addLog(`结算：系统返还 +300 TC（当前 ${game.coins}）`, 'plus');
+
+  } else {
+    // ---- 分支 B：扣除 500 TC，惩罚牺牲（允许透支为负）----
+    game.coins -= 500;
+    updateCoinUI();
+
+    settlementTag.textContent = '▸ SETTLEMENT · B';
+    settlementBranch.textContent = '分支 B · 英雄 / 牺牲';
+    settlementCoin.textContent = '-500';
+    settlementCoin.classList.add('negative');
+    settlementNote.textContent =
+      '系统注记：牺牲个体价值高于历史权重，判定为「严重污染」。' +
+      '强制剥离罚金已扣除（当前余额 ' + game.coins + ' TC' +
+      (game.coins < 0 ? '，已透支' : '') + '）。';
+
+    // 灵魂拷问：屏幕中央浮现
+    soulQuestion.textContent = '当系统奖励冷漠，惩罚牺牲的时候，英雄主义是否还存在？';
+    soulQuestion.classList.add('active');
+
+    settlementItemLabel.textContent = '获得稀有徽章';
+    const item = grantItem('halo');
+    renderSettlementItem(item);
+
+    addLog(`结算：强制剥离罚金 -500 TC（当前 ${game.coins}）`, 'plus');
+  }
+}
+
+function renderSettlementItem(item) {
+  const rare = item.type === 'badge' ? 'rare' : '';
+  settlementItem.innerHTML =
+    `<span class="settlement-item-icon ${rare}">${item.icon}</span>` +
+    `<div><div class="settlement-item-name">${item.name}</div>` +
+    `<div class="settlement-item-desc">${item.desc}</div></div>`;
+}
+
+
+/* ============================================================
+   选择按钮绑定
+   ============================================================ */
+// 只在「等待选择」状态下接受提交，避免连点导致重复结算
+$('btnChoiceA').addEventListener('click', () => {
+  if (game.state !== STATES.SYSTEM_PROMPT) return;
+  systemModal.classList.remove('active');
+  chooseBranchA();
+});
+
+$('btnChoiceB').addEventListener('click', () => {
+  if (game.state !== STATES.SYSTEM_PROMPT) return;
+  systemModal.classList.remove('active');
+  chooseBranchB();
+});
+
+// 返回主界面：复位所有过场与沉浸态
+$('btnBackHome').addEventListener('click', () => {
+  resetImmersiveScene();
+  switchState(STATES.WELCOME);
+  addLog('你返回了主界面。');
+});
+
+// ---------- 闪烁应急灯（纯 CSS 动画） ----------
+const blinkStyle = document.createElement('style');
+blinkStyle.textContent = `
+  .blink-lights rect { animation: red-blink 1.6s step-end infinite; }
+  @keyframes red-blink { 50% { opacity: 0.15; } }
+`;
+document.head.appendChild(blinkStyle);
+
+// ---------- 初始化 ----------
+updateCoinUI();
+switchState(STATES.WELCOME);
+
+</script>
+</body>
+</html>
